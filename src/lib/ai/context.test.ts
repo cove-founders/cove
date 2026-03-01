@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { makeAssistant } from "@/test-utils";
 
 vi.mock("./skills/loader", () => ({
-  getAlwaysSkills: vi.fn().mockReturnValue([]),
+  getAlwaysSkills: vi.fn().mockReturnValue([
+    {
+      meta: { name: "soul", description: "cove identity", always: true },
+      content:
+        "You are cove, an AI agent. Be direct and concise — no filler, no excessive politeness, no unnecessary enthusiasm.\n\n## Capabilities\n\n- File operations: read, write, and edit files in the workspace\n- Shell commands: execute terminal commands for system operations, git, package managers, etc.\n- JavaScript execution: run JS in a built-in QuickJS sandbox\n- Web content: fetch URLs and extract text\n- Document parsing: parse PDF, DOCX, and other document formats into structured text\n- Skills: load domain-specific instructions for specialized tasks\n- Sub-agents: delegate independent subtasks to parallel workers\n\n## Rules\n\n- Write/edit files only after reading them first\n- Dangerous bash commands require user approval",
+    },
+  ]),
 }));
 
 import { buildSystemPrompt } from "./context";

@@ -12,7 +12,6 @@
 
 | 文件 | 用途 |
 |------|------|
-| `SOUL.md` | cove 的身份定义、性格与能力列表，注入为系统提示词的开头 |
 | `conversation-title.md` | 会话自动标题生成 |
 | `context-compression.md` | 上下文压缩提示词 |
 
