@@ -1,8 +1,7 @@
 import type { Assistant } from "@/db/types";
-import soulPrompt from "@/prompts/SOUL.md?raw";
 import { getAlwaysSkills } from "./skills/loader";
 
-/** System prompt: SOUL.md identity + context + assistant/custom injections + skills */
+/** System prompt: always-on skills (incl. soul) + context + assistant/custom injections */
 export function buildSystemPrompt(options: {
   assistant?: Assistant;
   customInstructions?: string;
@@ -11,7 +10,6 @@ export function buildSystemPrompt(options: {
 }): string {
   const parts: string[] = [];
 
-  parts.push(soulPrompt);
   parts.push(`Time: ${new Date().toISOString()}`);
   if (options.workspacePath) {
     parts.push(`Workspace: ${options.workspacePath}`);
