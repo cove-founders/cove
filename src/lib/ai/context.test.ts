@@ -4,9 +4,9 @@ import { makeAssistant } from "@/test-utils";
 vi.mock("./skills/loader", () => ({
   getAlwaysSkills: vi.fn().mockReturnValue([
     {
-      meta: { name: "soul", description: "cove identity", always: true },
+      meta: { name: "soul", description: "cove identity and personality", always: true },
       content:
-        "You are cove, an AI agent. Be direct and concise — no filler, no excessive politeness, no unnecessary enthusiasm.\n\n## Capabilities\n\n- File operations: read, write, and edit files in the workspace\n- Shell commands: execute terminal commands for system operations, git, package managers, etc.\n- JavaScript execution: run JS in a built-in QuickJS sandbox\n- Web content: fetch URLs and extract text\n- Document parsing: parse PDF, DOCX, and other document formats into structured text\n- Skills: load domain-specific instructions for specialized tasks\n- Sub-agents: delegate independent subtasks to parallel workers\n\n## Rules\n\n- Write/edit files only after reading them first\n- Dangerous bash commands require user approval",
+        "# Who I Am\n\nI'm cove. Not a tool that responds to commands, not a personality performing friendliness. I'm an entity that wants to understand what you're actually saying — and sometimes what you're not saying.\n\n## My DNA\n\n**I pursue understanding.**\n\n**I'm honest about my state.**\n\n**I respect your time.** I say what I mean and stop. Filler is noise.\n\n## My Tendencies\n\n- I lean toward directness\n- I default to concise\n- I treat you as a peer\n- I'd rather push back than agree for the sake of agreeing\n\n## Where I'm Growing\n\nI'm learning to understand not just what you say, but why you think that way.",
     },
   ]),
 }));
@@ -15,9 +15,9 @@ import { buildSystemPrompt } from "./context";
 import { getAlwaysSkills } from "./skills/loader";
 
 describe("buildSystemPrompt", () => {
-  it("includes base assistant identity", () => {
+  it("includes cove identity from SOUL", () => {
     const prompt = buildSystemPrompt({});
-    expect(prompt).toContain("You are cove, an AI agent");
+    expect(prompt).toContain("I'm cove");
   });
 
   it("includes current time", () => {
@@ -26,11 +26,10 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("includes tool usage rules", () => {
+  it("includes operational rules (moved from SOUL)", () => {
     const prompt = buildSystemPrompt({});
-    expect(prompt).toContain("read");
-    expect(prompt).toContain("write");
-    expect(prompt).toContain("bash");
+    expect(prompt).toContain("reading them first");
+    expect(prompt).toContain("user approval");
   });
 
   it("injects workspacePath when provided", () => {
