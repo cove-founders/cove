@@ -143,6 +143,10 @@ src/
 - Types: PascalCase interfaces, avoid `I` prefix (`Message`, not `IMessage`)
 - CSS: Tailwind utility classes only. No custom CSS unless absolutely necessary.
 
+### Imports
+- Path alias: `@/` maps to `./src/` — use `@/components/...`, `@/hooks/...`, `@/stores/...` etc.
+- TypeScript strict mode with `noUnusedLocals`, `noUnusedParameters`, `noUncheckedIndexedAccess`
+
 ### Component Guidelines
 - Prefer composition over props. Small, focused components.
 - Use `cn()` (clsx + twMerge) for conditional classes.
@@ -323,15 +327,60 @@ metadata:                 # 可选，额外元数据
 - **可验证性**：MUST 含验收标准（checkbox）+ 验证命令（可自动化判定）
 - **分组**：按职责域分组，复杂模块（>300 行）独立为一个 issue
 
-### 构建 & 测试基准线
+### 构建 & 测试命令
 ```bash
-pnpm run build                       # 前端构建（含 tsc 类型检查）
-pnpm test                            # vitest 单元测试
+# 开发
+pnpm tauri dev                       # 完整 Tauri 桌面开发（前端 + Rust）
+pnpm dev                             # 仅前端 Vite dev server
+
+# 构建 & 检查
+pnpm run build                       # 前端构建（含 tsc -b 类型检查）
 cd src-tauri && cargo check          # Rust 静态检查
 python3 scripts/check-file-size.py  # 文件大小校验
+
+# 测试
+pnpm test                            # vitest 运行全部测试
+pnpm test -- src/path/to/file.test.ts  # 运行单个测试文件
+pnpm test:coverage                   # 运行测试并生成覆盖率报告
 ```
+
+### Pre-commit Hook
+
+Husky 在每次 `git commit` 前自动执行 `python3 scripts/check-file-size.py`，超出文件大小限制的提交会被阻止。
+
+### 测试约定
+
+- 测试框架：vitest + `@testing-library/react` + `happy-dom`
+- 覆盖率阈值（Phase 1）：Statements 15% / Branches 10% / Functions 15% / Lines 15%
+- 新增/修改的 `.ts`/`.tsx` 源文件 MUST 有对应 `.test.ts` 或 `.test.tsx`
+- 测试维度：正常路径 + 边界条件 + 错误处理 + 状态变迁
+- Store 测试用 `createStoreReset()` 隔离状态；DB 测试用 `createMockDb()` + `mockGetDb()`
+- 含交互逻辑、条件渲染或状态管理的组件 MUST 有 `.test.tsx`
+- 详细规则见 `.agent/workflows/test-quality.md`
+
+### 写作风格
+
+INTJ engineer voice. 直接、精确、无废话。
+- 禁止 emoji（commit message、PR、注释、文档中均不使用）
+- Commit 用祈使语气："Add X"，非 "Added X"
+- PR 描述用 bullet point 列出具体变更，禁止 "comprehensive"、"robust"、"elegant" 等自夸词汇
+- 详细规则见 `.agent/workflows/writing-style.md`
 
 ### AI 开发规则（Hard Constraint）
 - 开始任何开发工作前，MUST 按 `AGENTS.md` 中的顺序阅读所有必读文档
 - MUST 先阅读 `.agent/workflows/worktree-parallel.md`，再开始写任何代码
 - 如果当前工作目录是 `/Users/lizc/code/cove/`（主仓库），MUST NOT 在此创建功能分支或编写功能代码
+
+## 补充文档
+
+详细的架构说明和工作流规则分散在以下文件中：
+
+| 文档 | 内容 |
+|------|------|
+| `AGENTS.md` | AI 工具必读顺序、命令速查表 |
+| `.agent/workflows/*.md` | 10 个工作流文件：worktree、issue 拆分、构建测试、PR 提交、发版、测试质量、写作风格等 |
+| `docs/architecture.md` | 前端 → Zustand → lib/ai + lib/db → Tauri IPC 数据流 |
+| `docs/tools.md` | 8 个 AI 工具的参数与使用场景 |
+| `docs/agent-tool-skill-architecture.md` | 工具分类、Skill 门控、命名迁移 |
+| `docs/officellm-dual-track.md` | 内嵌 vs 外部 officellm 双轨体系（修改 officellm 代码前必读） |
+| `docs/providers.md` | 20+ LLM 供应商配置 |
