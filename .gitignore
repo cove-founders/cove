@@ -8,3 +8,4 @@ src-tauri/gen/
 .DS_Store
 *.code-workspace
 src-tauri/binaries/officellm-*
+src-tauri/binaries/.officellm-version
