@@ -9,3 +9,4 @@ src-tauri/gen/
 *.code-workspace
 src-tauri/binaries/officellm-*
 src-tauri/binaries/.officellm-version
+coverage/
