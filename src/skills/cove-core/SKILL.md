@@ -79,3 +79,18 @@ workspace.officellm("replace-text", { i: "doc.docx", o: "doc-new.docx", find: "f
 ```
 
 All paths are relative to workspace root.
+
+## Tool Selection Priority
+
+### Document operations (DOCX/PPTX/XLSX)
+
+1. **`cove_interpreter` + `workspace.officellm()`** -- preferred for most operations (stateless CLI or persistent server mode)
+2. **`office` Tauri tool** -- when `cove_interpreter` is insufficient (e.g. complex session management)
+3. MUST load OfficeLLM skill (via the `skill` tool) before calling any command by name
+
+### Common mistakes to avoid
+
+- Do NOT call `office` tool with `action:"call"` before loading the OfficeLLM skill -- you will guess wrong command names
+- Do NOT use `bash` to run officellm CLI when `cove_interpreter` or the `office` Tauri tool is available
+- Do NOT use `bash` for JSON parsing or math -- use `cove_interpreter`
+- Do NOT guess command parameters -- load the skill first, then use exact names from the reference

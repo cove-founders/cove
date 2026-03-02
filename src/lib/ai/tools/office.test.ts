@@ -90,7 +90,7 @@ describe("officeTool – doctor", () => {
     expect(result).toBe(JSON.stringify(data));
   });
 
-  it("returns error message when doctor status is error", async () => {
+  it("returns enhanced error message when doctor status is error", async () => {
     setupTauriMocks({
       officellm_doctor: () => ({
         status: "error",
@@ -103,6 +103,7 @@ describe("officeTool – doctor", () => {
     const result = await exec({ action: "doctor" });
     expect(result).toContain("Error running doctor");
     expect(result).toContain("officellm binary not found");
+    expect(result).toContain("[Hint]");
   });
 
   it("returns 'unknown' when error field is null", async () => {
@@ -184,7 +185,7 @@ describe("officeTool – call", () => {
     expect(result).toContain("command");
   });
 
-  it("returns error message when status is error", async () => {
+  it("returns enhanced error message when status is error", async () => {
     setupTauriMocks({
       officellm_call: () => ({
         status: "error",
@@ -197,6 +198,7 @@ describe("officeTool – call", () => {
     const result = await exec({ action: "call", command: "unknownCmd" });
     expect(result).toContain("Error");
     expect(result).toContain("command not recognized");
+    expect(result).toContain("[Hint]");
   });
 
   it("returns JSON stringified data on success", async () => {
@@ -214,7 +216,7 @@ describe("officeTool – call", () => {
     expect(result).toContain(JSON.stringify(data));
   });
 
-  it("passes args to invoke", async () => {
+  it("passes legacy array args to invoke", async () => {
     let capturedArgs: unknown;
     setupTauriMocks({
       officellm_call: (payload) => {
@@ -225,6 +227,32 @@ describe("officeTool – call", () => {
 
     await exec({ action: "call", command: "addSlide", args: ["--position", "2"] });
     expect(capturedArgs).toEqual(["--position", "2"]);
+  });
+
+  it("converts object args to CLI-style array", async () => {
+    let capturedArgs: unknown;
+    setupTauriMocks({
+      officellm_call: (payload) => {
+        capturedArgs = (payload as { args?: unknown })?.args;
+        return { status: "success", data: "ok", error: null, metrics: null };
+      },
+    });
+
+    await exec({ action: "call", command: "addSlide", args: { title: "New", position: "2" } });
+    expect(capturedArgs).toEqual(["--title", "New", "--position", "2"]);
+  });
+
+  it("converts single-char object keys to short flags", async () => {
+    let capturedArgs: unknown;
+    setupTauriMocks({
+      officellm_call: (payload) => {
+        capturedArgs = (payload as { args?: unknown })?.args;
+        return { status: "success", data: "ok", error: null, metrics: null };
+      },
+    });
+
+    await exec({ action: "call", command: "extract-text", args: { i: "doc.docx" } });
+    expect(capturedArgs).toEqual(["-i", "doc.docx"]);
   });
 });
 
@@ -309,7 +337,7 @@ describe("officeTool – status", () => {
 // ── error handling ────────────────────────────────────────────────────────────
 
 describe("officeTool – invoke error handling", () => {
-  it("catches Error thrown by invoke and returns error message", async () => {
+  it("catches Error thrown by invoke and returns enhanced error", async () => {
     setupTauriMocks({
       officellm_detect: () => {
         throw new Error("IPC channel closed");
@@ -319,9 +347,10 @@ describe("officeTool – invoke error handling", () => {
     const result = await exec({ action: "detect" });
     expect(result).toContain("Office tool error");
     expect(result).toContain("IPC channel closed");
+    expect(result).toContain("[Hint]");
   });
 
-  it("handles non-Error thrown values", async () => {
+  it("handles non-Error thrown values with hint", async () => {
     setupTauriMocks({
       officellm_close: () => {
         throw "unexpected failure";
@@ -331,5 +360,6 @@ describe("officeTool – invoke error handling", () => {
     const result = await exec({ action: "close" });
     expect(result).toContain("Office tool error");
     expect(result).toContain("unexpected failure");
+    expect(result).toContain("[Hint]");
   });
 });

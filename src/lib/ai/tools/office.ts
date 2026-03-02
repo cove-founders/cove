@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod/v4";
 import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { enhanceOfficeError } from "./office-errors";
 
 interface DetectResult {
   available: boolean;
@@ -23,9 +24,19 @@ interface SessionInfo {
   uptimeSecs: number;
 }
 
+/** Convert args (object or array) to CLI-style string[] for Rust IPC. */
+function toCliArgs(args?: Record<string, string> | string[]): string[] {
+  if (!args) return [];
+  if (Array.isArray(args)) return args;
+  return Object.entries(args).flatMap(([k, v]) => [
+    k.length === 1 ? `-${k}` : `--${k}`,
+    v,
+  ]);
+}
+
 export const officeTool = tool({
   description:
-    "Operate on Office documents (DOCX/PPTX/XLSX) via officellm. Actions: detect (check if installed), doctor (check external dependency status — libreoffice, pdftoppm, quarto), open (start session for a document), call (execute a command on the open document), save (save the document), close (end session), status (query session info).",
+    "Operate on Office documents (DOCX/PPTX/XLSX) via officellm. Actions: detect (check if installed), doctor (check external dependency status), open (start session for a document), call (execute a command), save (save the document), close (end session), status (query session info). IMPORTANT: Before using 'call', load the OfficeLLM skill via the skill tool to get correct command names and parameters. Pass args as key-value object, e.g. {title: 'New Slide', position: '2'}.",
   inputSchema: z.object({
     action: z
       .enum(["detect", "doctor", "open", "call", "save", "close", "status"])
@@ -39,9 +50,14 @@ export const officeTool = tool({
       .optional()
       .describe("Command name (required for 'call', e.g. 'addSlide', 'setText')"),
     args: z
-      .array(z.string())
+      .union([
+        z.record(z.string(), z.string()),
+        z.array(z.string()),
+      ])
       .optional()
-      .describe("CLI-style arguments for 'call', e.g. ['--limit', '50', '--page', '2']. For CLI mode without an open session, include '--input' and the file path."),
+      .describe(
+        "Command arguments as key-value object (preferred), e.g. {title: 'New Slide', position: '2'}. Legacy CLI-style array also accepted.",
+      ),
   }),
   execute: async ({ action, path, command, args }) => {
     try {
@@ -55,7 +71,8 @@ export const officeTool = tool({
         case "doctor": {
           const result = await invoke<CommandResult>("officellm_doctor");
           if (result.status === "error") {
-            return `Error running doctor: ${result.error ?? "unknown"}`;
+            const raw = result.error ?? "unknown";
+            return `Error running doctor: ${enhanceOfficeError("doctor", undefined, raw)}`;
           }
           return JSON.stringify(result.data);
         }
@@ -75,10 +92,11 @@ export const officeTool = tool({
           if (!command) return "Error: 'command' is required for the 'call' action.";
           const result = await invoke<CommandResult>("officellm_call", {
             cmd: command,
-            args: args ?? [],
+            args: toCliArgs(args),
           });
           if (result.status === "error") {
-            return `Error: ${result.error ?? "unknown error"}`;
+            const raw = result.error ?? "unknown error";
+            return `Error: ${enhanceOfficeError("call", command, raw)}`;
           }
           return JSON.stringify(result.data);
         }
@@ -105,7 +123,8 @@ export const officeTool = tool({
         }
       }
     } catch (err) {
-      return `Office tool error: ${err instanceof Error ? err.message : String(err)}`;
+      const raw = err instanceof Error ? err.message : String(err);
+      return `Office tool error: ${enhanceOfficeError("unknown", undefined, raw)}`;
     }
   },
 });

@@ -51,3 +51,43 @@ If Homebrew is missing or slow (China mainland), offer USTC mirror:
   ```
 
 Use `bash` tool for install commands. Re-run `doctor` to confirm.
+
+## Quick Reference (Common Operations)
+
+These examples work without loading the full OfficeLLM skill. Use the `office` Tauri tool or `cove_interpreter` with `workspace.officellm()`.
+
+### Extract text from a document
+
+```json
+{ "action": "call", "command": "extract-text", "args": { "i": "report.docx" } }
+```
+
+Or via `cove_interpreter`:
+
+```javascript
+const res = JSON.parse(workspace.officellm("extract-text", { i: "report.docx" }));
+console.log(res.data.text);
+```
+
+### Replace text in a document
+
+```json
+{ "action": "call", "command": "replace-text", "args": { "i": "doc.docx", "o": "doc-out.docx", "find": "old text", "replace": "new text" } }
+```
+
+### Server mode (multiple operations on one document)
+
+```javascript
+workspace.officellm("open", { path: "presentation.pptx" });
+// ... multiple commands ...
+workspace.officellm("save", {});
+workspace.officellm("close", {});
+```
+
+### Check session status
+
+```json
+{ "action": "status" }
+```
+
+For the full command reference (~100 commands), load the OfficeLLM skill via the `skill` tool.

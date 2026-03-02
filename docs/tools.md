@@ -168,7 +168,7 @@ Cove 的 AI 工具分为 built-in（始终可用）和 skill-bundled（需 Skill
 | `action` | `string` | 操作类型（见下表） |
 | `path` | `string?` | 文档路径（`open` 时必填；`save` 时可选，表示另存为） |
 | `command` | `string?` | 命令名称（`call` 时必填，如 `addSlide`、`setText`） |
-| `args` | `object?` | 命令参数键值对（`call` 时可选） |
+| `args` | `object \| string[]` | 命令参数，推荐用键值对 object（如 `{title: "New Slide"}`），也兼容 CLI 风格数组 |
 
 **支持的 action**
 
