@@ -46,23 +46,34 @@ describe("maybeGenerateSummary", () => {
       id: "s1",
       conversation_id: "conv-1",
       summary: "existing",
-      created_at: "",
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     });
     await maybeGenerateSummary("conv-1", makeMessages(6), generateFn);
     expect(generateFn).not.toHaveBeenCalled();
   });
 
-  it("updates summary when conversation has grown significantly", async () => {
+  it("skips when summary was recently refreshed even with enough messages", async () => {
+    vi.mocked(summaryRepo.getByConversation).mockResolvedValue({
+      id: "s1",
+      conversation_id: "conv-1",
+      summary: "recent summary",
+      created_at: new Date().toISOString(), // just created
+    });
+    await maybeGenerateSummary("conv-1", makeMessages(10), generateFn);
+    expect(generateFn).not.toHaveBeenCalled();
+  });
+
+  it("updates summary when conversation has grown and cooldown elapsed", async () => {
     vi.mocked(summaryRepo.getByConversation).mockResolvedValue({
       id: "s1",
       conversation_id: "conv-1",
       summary: "old summary",
-      created_at: "",
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     });
     generateFn.mockResolvedValue(
       '{"summary":"Updated summary","keywords":"new,stuff"}',
     );
-    // 8 messages = MIN_MESSAGES * STALE_GROWTH_FACTOR, triggers refresh
+    // 8 messages + 2h old = stale
     await maybeGenerateSummary("conv-1", makeMessages(8), generateFn);
     expect(generateFn).toHaveBeenCalledOnce();
     expect(summaryRepo.create).toHaveBeenCalledWith(

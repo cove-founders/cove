@@ -331,9 +331,12 @@ Migration is idempotent -- only runs if old files exist and new ones don't.
 ### Summary Uniqueness (Migration)
 
 `summaryRepo.create()` uses `INSERT OR REPLACE` with a unique constraint on
-`conversation_id`. This ensures at most one summary per conversation. No separate
-migration step is needed for historical data -- any duplicate entries are
-resolved on next write.
+`conversation_id`. This ensures at most one summary per conversation.
+
+For pre-existing data that may contain duplicates, `runMigrations()` in
+`db/index.ts` runs an explicit dedup step: keeps the newest row per
+`conversation_id` (by `MAX(created_at)`) and deletes the rest. This runs
+on every app startup and is idempotent.
 
 ### Post-Conversation Hooks
 
@@ -342,8 +345,10 @@ Two async, non-blocking operations after stream completion:
 2. Observation recording to `private/observations.md` (if >= 2 user turns)
 
 Stale summary detection: a summary is refreshed when the conversation has grown
-to at least 2x the minimum threshold (8+ messages). This prevents Archive recall
-from operating on outdated summaries for long-running conversations.
+to at least 2x the minimum threshold (8+ messages) AND the existing summary is
+older than 1 hour. The cooldown prevents repeated refreshes -- `INSERT OR REPLACE`
+resets `created_at` on each write, so the next refresh won't trigger until the
+cooldown elapses again.
 
 Both fire-and-forget with error logging. Do not block user interaction.
 

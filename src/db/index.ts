@@ -26,6 +26,18 @@ async function runMigrations(database: Database): Promise<void> {
       // Column/table already exists — ignore
     }
   }
+  // Deduplicate legacy conversation_summaries (keep newest per conversation_id)
+  try {
+    await database.execute(
+      `DELETE FROM conversation_summaries WHERE id NOT IN (
+        SELECT id FROM conversation_summaries
+        GROUP BY conversation_id
+        HAVING MAX(created_at)
+      )`,
+    );
+  } catch {
+    // Table may not exist yet or no duplicates — ignore
+  }
   // 首次创建 message_fts 后从 messages 回填
   try {
     const rows = (await database.select("SELECT COUNT(*) as c FROM message_fts")) as { c: number }[];

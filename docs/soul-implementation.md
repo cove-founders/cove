@@ -128,12 +128,22 @@ meditation can only add parenthetical annotations.
 
 ### summary.ts
 
-**Stale detection**: a summary is refreshed when message count >= MIN * 2 (8+).
-This prevents Archive recall from operating on outdated summaries for
-long-running conversations.
+**Stale detection**: two conditions must both be true:
+1. Message count >= MIN * 2 (8+)
+2. Summary `created_at` is older than 1 hour (cooldown)
+
+The cooldown prevents churn: after a refresh, `INSERT OR REPLACE` resets
+`created_at`, so the next refresh won't fire until the cooldown elapses.
+Without the cooldown, every post-stream hook would re-trigger generation
+for any conversation with 8+ messages.
 
 On update, the existing summary's UUID is reused (`INSERT OR REPLACE`),
 maintaining the `conversation_id` unique constraint without creating duplicates.
+
+**Dedup migration**: `runMigrations()` in `db/index.ts` runs an explicit dedup
+on startup -- keeps the newest row per `conversation_id` by `MAX(created_at)`.
+Handles pre-existing data that may have accumulated duplicates before the
+UNIQUE constraint was added.
 
 ### tools/recall.ts
 

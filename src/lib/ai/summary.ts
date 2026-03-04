@@ -10,6 +10,7 @@ import { summaryRepo } from "@/db/repos/summaryRepo";
 
 const MIN_MESSAGES_FOR_SUMMARY = 4;
 const STALE_GROWTH_FACTOR = 2;
+const SUMMARY_REFRESH_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
 /**
  * Generate and store a conversation summary if conditions are met.
@@ -27,7 +28,7 @@ export async function maybeGenerateSummary(
   if (substantive.length < MIN_MESSAGES_FOR_SUMMARY) return;
 
   const existing = await summaryRepo.getByConversation(conversationId);
-  if (existing && !isStaleSummary(existing.summary, substantive.length)) {
+  if (existing && !isStaleSummary(existing.created_at, substantive.length)) {
     return;
   }
 
@@ -66,17 +67,20 @@ ${transcript}`;
 }
 
 /**
- * A summary is stale if the conversation has grown significantly since
- * it was generated. We estimate original size from summary length heuristic
- * and compare against current message count.
+ * A summary is stale when the conversation has grown past the refresh
+ * threshold AND enough time has elapsed since last generation.
+ * INSERT OR REPLACE resets created_at on each write, so the cooldown
+ * prevents repeated refreshes after the first one.
  */
 function isStaleSummary(
-  _summary: string,
+  createdAt: string,
   currentMessageCount: number,
 ): boolean {
-  // Summaries are generated at MIN_MESSAGES_FOR_SUMMARY or later.
-  // Consider stale when message count has at least doubled since threshold.
-  return currentMessageCount >= MIN_MESSAGES_FOR_SUMMARY * STALE_GROWTH_FACTOR;
+  if (currentMessageCount < MIN_MESSAGES_FOR_SUMMARY * STALE_GROWTH_FACTOR) {
+    return false;
+  }
+  const age = Date.now() - new Date(createdAt).getTime();
+  return age > SUMMARY_REFRESH_COOLDOWN_MS;
 }
 
 function parseSummaryResponse(raw: string): {
