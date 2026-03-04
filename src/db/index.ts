@@ -8,6 +8,16 @@ async function runMigrations(database: Database): Promise<void> {
     "ALTER TABLE conversations ADD COLUMN provider_type TEXT",
     "CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(body, conversation_id UNINDEXED, message_id UNINDEXED)",
     "ALTER TABLE conversations ADD COLUMN summary_up_to TEXT",
+    // SOUL: conversation summaries for archive retrieval
+    `CREATE TABLE IF NOT EXISTS conversation_summaries (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL UNIQUE,
+      summary TEXT NOT NULL,
+      keywords TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    )`,
+    "CREATE VIRTUAL TABLE IF NOT EXISTS conversation_summaries_fts USING fts5(summary, keywords, conversation_id UNINDEXED)",
   ];
   for (const sql of migrations) {
     try {
@@ -15,6 +25,22 @@ async function runMigrations(database: Database): Promise<void> {
     } catch {
       // Column/table already exists — ignore
     }
+  }
+  // Deduplicate legacy conversation_summaries (keep newest per conversation_id)
+  // then enforce uniqueness durably via index for tables created without UNIQUE
+  try {
+    await database.execute(
+      `DELETE FROM conversation_summaries WHERE id NOT IN (
+        SELECT id FROM conversation_summaries
+        GROUP BY conversation_id
+        HAVING MAX(created_at)
+      )`,
+    );
+    await database.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_summaries_conversation_id ON conversation_summaries(conversation_id)",
+    );
+  } catch {
+    // Table may not exist yet or no duplicates — ignore
   }
   // 首次创建 message_fts 后从 messages 回填
   try {
