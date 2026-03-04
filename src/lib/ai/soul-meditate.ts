@@ -10,7 +10,6 @@ import { readSoul, writeSoul, snapshotSoul } from "./soul";
 
 const MIN_OBSERVATIONS_FOR_MEDITATION = 5;
 const MEDITATION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
-const MEDITATION_MARKER = "<!-- last-meditation:";
 
 /**
  * Check if meditation is needed and perform it if so.
@@ -47,7 +46,12 @@ export async function maybeMeditate(
 
   try {
     const raw = await generateFn(prompt);
-    const result = parseMeditationResult(raw, soul.public);
+    const result = parseMeditationResult(raw);
+
+    if (!result) {
+      console.warn("[SOUL] meditation parse failed -- aborting to preserve data");
+      return;
+    }
 
     // Verify DNA integrity
     const dnaAfter = extractDnaSection(result.publicSoul);
@@ -103,8 +107,7 @@ Don't chase change -- if nothing needs updating, keep things as they are.`;
 
 function parseMeditationResult(
   raw: string,
-  currentPublic: string,
-): { publicSoul: string; privateSoul: string } {
+): { publicSoul: string; privateSoul: string } | null {
   const publicMarker = "=== PUBLIC SOUL ===";
   const privateMarker = "=== PRIVATE SOUL ===";
 
@@ -112,12 +115,8 @@ function parseMeditationResult(
   const privateIdx = raw.indexOf(privateMarker);
 
   if (publicIdx === -1 || privateIdx === -1) {
-    // Could not parse -- return current with just a meditation marker
-    const markerLine = `\n${MEDITATION_MARKER}${new Date().toISOString()} -->`;
-    return {
-      publicSoul: currentPublic,
-      privateSoul: `# Private\n\n## Observations\n${markerLine}\n`,
-    };
+    // Could not parse -- abort to avoid data loss
+    return null;
   }
 
   const publicSoul = raw

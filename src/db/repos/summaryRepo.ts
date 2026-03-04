@@ -9,6 +9,13 @@ export interface SummarySearchResult {
   rank: number;
 }
 
+/** Normalize query for FTS5 MATCH: escape quotes, collapse whitespace. */
+function normalizeFtsQuery(query: string): string {
+  const q = query.trim();
+  if (!q) return "";
+  return q.replace(/"/g, '""').split(/\s+/).filter(Boolean).join(" ");
+}
+
 export const summaryRepo = {
   async create(
     id: string,
@@ -22,7 +29,11 @@ export const summaryRepo = {
        VALUES ($1, $2, $3, $4)`,
       [id, conversationId, summary, keywords ?? null],
     );
-    // Sync FTS index
+    // Sync FTS: delete stale entry then insert fresh
+    await db.execute(
+      "DELETE FROM conversation_summaries_fts WHERE conversation_id = $1",
+      [conversationId],
+    );
     await db.execute(
       `INSERT INTO conversation_summaries_fts (summary, keywords, conversation_id)
        VALUES ($1, $2, $3)`,
@@ -45,15 +56,21 @@ export const summaryRepo = {
     query: string,
     limit = 5,
   ): Promise<SummarySearchResult[]> {
+    const ftsQuery = normalizeFtsQuery(query);
+    if (!ftsQuery) return [];
     const db = await getDb();
-    return db.select(
-      `SELECT conversation_id, summary, keywords, rank
-       FROM conversation_summaries_fts
-       WHERE conversation_summaries_fts MATCH $1
-       ORDER BY rank
-       LIMIT $2`,
-      [query, limit],
-    );
+    try {
+      return await db.select(
+        `SELECT conversation_id, summary, keywords, rank
+         FROM conversation_summaries_fts
+         WHERE conversation_summaries_fts MATCH $1
+         ORDER BY rank
+         LIMIT $2`,
+        [ftsQuery, limit],
+      );
+    } catch {
+      return [];
+    }
   },
 
   async searchMessages(
@@ -84,6 +101,11 @@ export const summaryRepo = {
 
   async deleteByConversation(conversationId: string): Promise<void> {
     const db = await getDb();
+    // Clean FTS first, then base table
+    await db.execute(
+      "DELETE FROM conversation_summaries_fts WHERE conversation_id = $1",
+      [conversationId],
+    );
     await db.execute(
       "DELETE FROM conversation_summaries WHERE conversation_id = $1",
       [conversationId],

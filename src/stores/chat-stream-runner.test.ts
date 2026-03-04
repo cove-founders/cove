@@ -16,6 +16,13 @@ vi.mock("@/lib/ai/soul", () => ({
   readSoul: vi.fn().mockResolvedValue({ public: "", private: "" }),
   formatSoulPrompt: vi.fn().mockReturnValue(""),
 }));
+vi.mock("@/lib/ai/soul-meditate", () => ({
+  maybeMeditate: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("ai")>();
+  return { ...actual, generateText: vi.fn().mockResolvedValue({ text: "" }) };
+});
 vi.mock("@/lib/ai/tools", () => ({ getAgentTools: vi.fn().mockReturnValue({}) }));
 vi.mock("./skillsStore", () => ({ getEnabledSkillNames: vi.fn().mockResolvedValue([]) }));
 vi.mock("./chat-retry-utils", () => ({
@@ -36,6 +43,7 @@ import { buildSystemPrompt } from "@/lib/ai/context";
 import { isOfficeAvailable } from "@/lib/ai/office-detect";
 import { getAgentTools } from "@/lib/ai/tools";
 import { getEnabledSkillNames } from "./skillsStore";
+import { maybeMeditate } from "@/lib/ai/soul-meditate";
 import { isRateLimitErrorMessage, backoffDelayMs, sleep } from "./chat-retry-utils";
 import { runStreamLoop } from "./chat-stream-runner";
 import type { StreamRunOptions, StreamRunCallbacks } from "./chat-stream-runner";
@@ -361,6 +369,16 @@ describe("runStreamLoop", () => {
       expect(runAgent).toHaveBeenCalledWith(
         expect.objectContaining({ maxOutputTokens: undefined }),
       );
+    });
+
+    it("triggers maybeMeditate at conversation start", async () => {
+      const result = makeStreamResult();
+      vi.mocked(runAgent).mockReturnValue("s" as never);
+      vi.mocked(handleAgentStream).mockResolvedValue(result);
+
+      await runStreamLoop(makeOpts(), makeCallbacks());
+
+      expect(maybeMeditate).toHaveBeenCalledWith(expect.any(Function));
     });
   });
 });

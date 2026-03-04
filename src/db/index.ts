@@ -11,7 +11,7 @@ async function runMigrations(database: Database): Promise<void> {
     // SOUL: conversation summaries for archive retrieval
     `CREATE TABLE IF NOT EXISTS conversation_summaries (
       id TEXT PRIMARY KEY,
-      conversation_id TEXT NOT NULL,
+      conversation_id TEXT NOT NULL UNIQUE,
       summary TEXT NOT NULL,
       keywords TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),

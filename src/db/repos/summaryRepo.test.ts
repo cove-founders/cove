@@ -18,10 +18,10 @@ beforeEach(async () => {
 
 describe("summaryRepo", () => {
   describe("create", () => {
-    it("inserts into summaries and syncs FTS", async () => {
+    it("inserts into summaries, deletes stale FTS, then inserts FTS", async () => {
       await summaryRepo.create("s1", "conv-1", "Test summary", "test,kw");
 
-      expect(db.execute).toHaveBeenCalledTimes(2);
+      expect(db.execute).toHaveBeenCalledTimes(3);
       expect(db.execute.mock.calls[0][0]).toContain(
         "INSERT OR REPLACE INTO conversation_summaries",
       );
@@ -31,7 +31,13 @@ describe("summaryRepo", () => {
         "Test summary",
         "test,kw",
       ]);
+      // Delete stale FTS entry
       expect(db.execute.mock.calls[1][0]).toContain(
+        "DELETE FROM conversation_summaries_fts",
+      );
+      expect(db.execute.mock.calls[1][1]).toEqual(["conv-1"]);
+      // Insert fresh FTS entry
+      expect(db.execute.mock.calls[2][0]).toContain(
         "INSERT INTO conversation_summaries_fts",
       );
     });
@@ -45,8 +51,8 @@ describe("summaryRepo", () => {
         "No keywords",
         null,
       ]);
-      // FTS gets empty string for keywords
-      expect(db.execute.mock.calls[1][1]).toEqual([
+      // FTS insert gets empty string for keywords
+      expect(db.execute.mock.calls[2][1]).toEqual([
         "No keywords",
         "",
         "conv-2",
@@ -80,25 +86,6 @@ describe("summaryRepo", () => {
     });
   });
 
-  describe("searchSummaries", () => {
-    it("queries FTS with MATCH and default limit", async () => {
-      db.select.mockResolvedValueOnce([]);
-      await summaryRepo.searchSummaries("architecture");
-
-      expect(db.select).toHaveBeenCalledWith(
-        expect.stringContaining("MATCH $1"),
-        ["architecture", 5],
-      );
-    });
-
-    it("respects custom limit", async () => {
-      db.select.mockResolvedValueOnce([]);
-      await summaryRepo.searchSummaries("test", 3);
-
-      expect(db.select.mock.calls[0][1]).toEqual(["test", 3]);
-    });
-  });
-
   describe("searchMessages", () => {
     it("filters by conversationId when provided", async () => {
       db.select.mockResolvedValueOnce([]);
@@ -120,15 +107,53 @@ describe("summaryRepo", () => {
   });
 
   describe("deleteByConversation", () => {
-    it("deletes summaries by conversation_id", async () => {
+    it("deletes FTS first then base table", async () => {
       await summaryRepo.deleteByConversation("conv-del");
 
-      expect(db.execute).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "DELETE FROM conversation_summaries WHERE conversation_id = $1",
-        ),
-        ["conv-del"],
+      expect(db.execute).toHaveBeenCalledTimes(2);
+      // FTS deleted first
+      expect(db.execute.mock.calls[0][0]).toContain(
+        "DELETE FROM conversation_summaries_fts",
       );
+      expect(db.execute.mock.calls[0][1]).toEqual(["conv-del"]);
+      // Base table deleted second
+      expect(db.execute.mock.calls[1][0]).toContain(
+        "DELETE FROM conversation_summaries WHERE conversation_id = $1",
+      );
+      expect(db.execute.mock.calls[1][1]).toEqual(["conv-del"]);
+    });
+  });
+
+  describe("searchSummaries", () => {
+    it("queries FTS with MATCH and default limit", async () => {
+      db.select.mockResolvedValueOnce([]);
+      await summaryRepo.searchSummaries("architecture");
+
+      expect(db.select).toHaveBeenCalledWith(
+        expect.stringContaining("MATCH $1"),
+        ["architecture", 5],
+      );
+    });
+
+    it("respects custom limit", async () => {
+      db.select.mockResolvedValueOnce([]);
+      await summaryRepo.searchSummaries("test", 3);
+
+      expect(db.select.mock.calls[0][1]).toEqual(["test", 3]);
+    });
+
+    it("returns empty for blank query without db call", async () => {
+      const result = await summaryRepo.searchSummaries("   ");
+      expect(result).toEqual([]);
+      expect(db.select).not.toHaveBeenCalled();
+    });
+
+    it("escapes double quotes in query", async () => {
+      db.select.mockResolvedValueOnce([]);
+      await summaryRepo.searchSummaries('say "hello"');
+
+      const ftsQuery = db.select.mock.calls[0][1][0];
+      expect(ftsQuery).toBe('say ""hello""');
     });
   });
 });

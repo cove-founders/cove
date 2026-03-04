@@ -9,6 +9,8 @@ import { handleAgentStream, type StreamResult } from "@/lib/ai/stream-handler";
 import { buildSystemPrompt } from "@/lib/ai/context";
 import { isOfficeAvailable } from "@/lib/ai/office-detect";
 import { readSoul, formatSoulPrompt } from "@/lib/ai/soul";
+import { maybeMeditate } from "@/lib/ai/soul-meditate";
+import { generateText } from "ai";
 import { getAgentTools } from "@/lib/ai/tools";
 import type { SubAgentContext } from "@/lib/ai/sub-agent";
 import { getEnabledSkillNames } from "./skillsStore";
@@ -51,6 +53,11 @@ export async function runStreamLoop(
   const enabledSkillNames = await getEnabledSkillNames();
   const officeAvailable = await isOfficeAvailable();
   const soulPrompt = formatSoulPrompt(await readSoul());
+
+  // Fire-and-forget: meditation check at conversation start
+  const meditateGen = async (p: string) => (await generateText({ model, prompt: p, maxOutputTokens: 1000 })).text;
+  maybeMeditate(meditateGen).catch((e) => console.error("[SOUL] meditation error:", e));
+
   // Build base tools first (without spawn_agent) to use as parentTools
   const baseTools = getAgentTools(enabledSkillNames, {
     runtimeAvailability: { office: officeAvailable },

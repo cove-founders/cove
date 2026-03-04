@@ -76,4 +76,19 @@ describe("maybeMeditate", () => {
     );
     spy.mockRestore();
   });
+
+  it("aborts without writing when parse fails (no markers in output)", async () => {
+    vi.mocked(readSoul).mockResolvedValue({
+      public: "# Who I Am\n\n## My DNA\nTest DNA\n\n## My Tendencies\nDirect",
+      private: "# Private\n\n## Observations\n- a\n- b\n- c\n- d\n- e\n- f",
+    });
+    generateFn.mockResolvedValue("Some rambling text without markers");
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await maybeMeditate(generateFn);
+    expect(writeSoul).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining("meditation parse failed"),
+    );
+    spy.mockRestore();
+  });
 });
