@@ -8,33 +8,17 @@ Technical reference for implementing cove's identity system.
 
 Three-layer separation:
 
-```
-+--------------------------------------------------+
-|                    SOUL                           |
-|  DNA (immutable): understanding-driven, truth,   |
-|                   candor                          |
-|  Disposition (high inertia): stance, values       |
-|  Style (low inertia): density, expression mode    |
-|  Growth (reflection-updated): direction, judgment |
-|  Private (free directory): observations inbox,    |
-|           cove-organized files                    |
-+--------------------------------------------------+
-         ^ injected into every conversation
-         |
-+--------------------------------------------------+
-|                   Skills                          |
-|  Modular capabilities, pluggable, identity-free   |
-|  Skill memory = resources/ domain notes           |
-+--------------------------------------------------+
-         ^ loaded on demand
-         |
-+--------------------------------------------------+
-|                  Archive                          |
-|  FTS-indexed: conversation summaries + messages   |
-|  Two-tier retrieval: recall -> recall_detail      |
-|  Forgetting is natural -- don't search, doesn't  |
-|  exist                                           |
-+--------------------------------------------------+
+```mermaid
+graph TD
+    SOUL["<b>SOUL</b><br/>DNA (immutable): understanding, truth, candor<br/>Disposition (high inertia): stance, values<br/>Style (low inertia): density, expression<br/>Growth (reflection-updated): direction, judgment<br/>Private (free directory): observations inbox"]
+    Skills["<b>Skills</b><br/>Modular capabilities, pluggable, identity-free<br/>Skill memory = resources/ domain notes"]
+    Archive["<b>Archive</b><br/>FTS-indexed: conversation summaries + messages<br/>Two-tier retrieval: recall → recall_detail<br/>Forgetting is natural — don't search, doesn't exist"]
+
+    SOUL -->|"injected into every conversation"| Conversation
+    Skills -->|"loaded on demand"| Conversation
+    Archive -->|"searched when needed"| Conversation
+
+    Conversation["Conversation Context"]
 ```
 
 ---
