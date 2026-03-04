@@ -41,6 +41,9 @@ describe("recallTool", () => {
     );
     expect(result).toHaveProperty("found", true);
     expect(result).toHaveProperty("count", 1);
+    const r = result as { results: string };
+    const parsed = JSON.parse(r.results) as Record<string, unknown>[];
+    expect(parsed[0]).toHaveProperty("date", "2026-03-01");
   });
 });
 

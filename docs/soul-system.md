@@ -328,11 +328,22 @@ On first `read_soul()` call, `ensure_soul_files()` detects and migrates legacy s
 
 Migration is idempotent -- only runs if old files exist and new ones don't.
 
+### Summary Uniqueness (Migration)
+
+`summaryRepo.create()` uses `INSERT OR REPLACE` with a unique constraint on
+`conversation_id`. This ensures at most one summary per conversation. No separate
+migration step is needed for historical data -- any duplicate entries are
+resolved on next write.
+
 ### Post-Conversation Hooks
 
 Two async, non-blocking operations after stream completion:
-1. Summary generation (if >= 4 messages, no existing summary)
+1. Summary generation (>= 4 messages; creates new or refreshes stale summary)
 2. Observation recording to `private/observations.md` (if >= 2 user turns)
+
+Stale summary detection: a summary is refreshed when the conversation has grown
+to at least 2x the minimum threshold (8+ messages). This prevents Archive recall
+from operating on outdated summaries for long-running conversations.
 
 Both fire-and-forget with error logging. Do not block user interaction.
 

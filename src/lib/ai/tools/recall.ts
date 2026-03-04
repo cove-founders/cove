@@ -30,6 +30,7 @@ export const recallTool = tool({
         conversationId: r.conversation_id,
         summary: r.summary,
         keywords: r.keywords,
+        date: r.created_at,
       }));
       const output = JSON.stringify(items, null, 2);
       return {

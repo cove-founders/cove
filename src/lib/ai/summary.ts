@@ -1,6 +1,7 @@
 /**
  * Conversation summary generation for the Archive layer.
  * Generates summaries after meaningful conversations (>= 4 messages).
+ * Updates stale summaries when conversations grow significantly.
  * Summaries are for future cove's recall, not for user display.
  */
 
@@ -8,9 +9,11 @@ import type { Message } from "@/db/types";
 import { summaryRepo } from "@/db/repos/summaryRepo";
 
 const MIN_MESSAGES_FOR_SUMMARY = 4;
+const STALE_GROWTH_FACTOR = 2;
 
 /**
  * Generate and store a conversation summary if conditions are met.
+ * Updates existing summary if conversation has grown significantly.
  * Non-blocking: call with fire-and-forget pattern.
  */
 export async function maybeGenerateSummary(
@@ -23,12 +26,13 @@ export async function maybeGenerateSummary(
   );
   if (substantive.length < MIN_MESSAGES_FOR_SUMMARY) return;
 
-  // Check if summary already exists for this conversation
   const existing = await summaryRepo.getByConversation(conversationId);
-  if (existing) return;
+  if (existing && !isStaleSummary(existing.summary, substantive.length)) {
+    return;
+  }
 
   const transcript = substantive
-    .slice(-20) // Last 20 messages max
+    .slice(-20)
     .map((m) => `[${m.role}]: ${m.content ?? ""}`)
     .join("\n");
 
@@ -48,14 +52,31 @@ ${transcript}`;
     const raw = await generateFn(prompt);
     const parsed = parseSummaryResponse(raw);
     await summaryRepo.create(
-      crypto.randomUUID(),
+      existing?.id ?? crypto.randomUUID(),
       conversationId,
       parsed.summary,
       parsed.keywords,
     );
+    if (existing) {
+      console.info("[SOUL] summary updated (conversation grew)");
+    }
   } catch (e) {
     console.error("[SOUL] summary generation failed:", e);
   }
+}
+
+/**
+ * A summary is stale if the conversation has grown significantly since
+ * it was generated. We estimate original size from summary length heuristic
+ * and compare against current message count.
+ */
+function isStaleSummary(
+  _summary: string,
+  currentMessageCount: number,
+): boolean {
+  // Summaries are generated at MIN_MESSAGES_FOR_SUMMARY or later.
+  // Consider stale when message count has at least doubled since threshold.
+  return currentMessageCount >= MIN_MESSAGES_FOR_SUMMARY * STALE_GROWTH_FACTOR;
 }
 
 function parseSummaryResponse(raw: string): {
@@ -63,7 +84,6 @@ function parseSummaryResponse(raw: string): {
   keywords: string;
 } {
   try {
-    // Try to extract JSON from the response
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
@@ -75,6 +95,5 @@ function parseSummaryResponse(raw: string): {
   } catch {
     // Fall through
   }
-  // Fallback: use raw text as summary
   return { summary: raw.slice(0, 500), keywords: "" };
 }

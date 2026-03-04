@@ -61,10 +61,12 @@ export const summaryRepo = {
     const db = await getDb();
     try {
       return await db.select(
-        `SELECT conversation_id, summary, keywords, rank
-         FROM conversation_summaries_fts
+        `SELECT f.conversation_id, f.summary, f.keywords, f.rank,
+                s.created_at
+         FROM conversation_summaries_fts f
+         JOIN conversation_summaries s ON s.conversation_id = f.conversation_id
          WHERE conversation_summaries_fts MATCH $1
-         ORDER BY rank
+         ORDER BY f.rank
          LIMIT $2`,
         [ftsQuery, limit],
       );
