@@ -122,7 +122,7 @@ Agent 自动调用，无需手动触发：
 | `spawn_agent` | 启动子 agent 执行独立子任务 |
 | `write_skill` | 创建新技能并保存到磁盘 |
 
-详细说明见 [docs/tools.md](docs/tools.md)。
+部分工具的参数与使用场景见 [docs/tools.md](docs/tools.md)。
 
 ## 文档
 
