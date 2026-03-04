@@ -4,6 +4,74 @@ Technical reference for implementing cove's identity system.
 
 ---
 
+## What is SOUL
+
+SOUL is cove's persistent identity -- not a memory store, but a representation of who she
+is right now. The core thesis: memory only records the present; history is a library you
+visit when needed; what matters is carrying "who you are" into every conversation.
+
+Three concepts underpin the design:
+- **SOUL** = the present self. Character, values, behavioral patterns. Injected into every
+  conversation -- no retrieval needed because it IS the current state.
+- **Skills** = capabilities. Pluggable, identity-free. What cove can do, not who she is.
+- **Archive** = a library. Past conversations indexed by FTS. Searched on demand, forgotten
+  naturally when not searched.
+
+SOUL evolves through a two-layer mechanism modeled on human cognition: experience during
+the day (real-time observation), organize during sleep (meditation distillation).
+
+## End-to-End Data Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant R as chat-stream-runner.ts
+    participant S as soul.ts
+    participant M as soul-meditate.ts
+    participant C as context.ts
+    participant P as post-conversation.ts
+    participant O as soul-observe.ts
+    participant Sum as summary.ts
+    participant A as Archive (SQLite)
+
+    Note over U,A: Conversation Start
+    U->>R: Opens conversation
+    R->>S: readSoul()
+    S-->>R: SOUL.md + private/ files
+    R->>R: soulPrompt = formatSoulPrompt(soul)
+    R-)M: maybeMeditate() [fire-and-forget]
+    Note right of M: Runs async in background.<br/>Current turn uses pre-meditation SOUL.
+    R->>C: buildSystemPrompt(soulPrompt, ...)
+
+    Note over U,A: During Conversation
+    U->>R: Messages exchanged
+
+    par Meditation (background, if triggered)
+        M->>M: Check observation count >= threshold AND cooldown
+        M->>S: snapshotSoul()
+        M->>M: LLM call (meditation prompt)
+        M->>M: Verify DNA + Disposition integrity
+        M->>S: writeSoul() + writeSoulPrivate()
+        Note right of M: Updated SOUL visible from next conversation
+    end
+
+    Note over U,A: Stream Completion
+    R->>P: runPostConversationTasks()
+    P-)Sum: maybeGenerateSummary() [>= 4 messages, fire-and-forget]
+    Sum->>A: INSERT OR REPLACE summary
+    P-)O: maybeRecordObservation() [>= 2 user turns, fire-and-forget]
+    O->>S: writeSoulPrivate("observations.md", ...)
+```
+
+Key integration points:
+- `chat-stream-runner.ts` -- reads SOUL, fires meditation, builds prompt. Meditation is
+  fire-and-forget: the current conversation uses pre-meditation SOUL; updates take effect
+  from the next conversation.
+- `context.ts:buildSystemPrompt()` -- injects `formatSoulPrompt()` output at the top
+- `post-conversation.ts:runPostConversationTasks()` -- orchestrates fire-and-forget hooks
+
+---
+
 ## Architecture
 
 Three-layer separation:
