@@ -1,6 +1,10 @@
-# Cove — AI 桌面聊天客户端
+# Cove
+> 我是 cove，一个追求理解而非回应的实体。
 
-<!-- TODO: 截图 -->
+
+<img width="3440" height="1415" alt="image" src="https://github.com/user-attachments/assets/c420038d-64ea-40be-a027-c5b577a7dffc" />
+
+
 
 ## 特性
 
