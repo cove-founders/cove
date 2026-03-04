@@ -71,6 +71,9 @@ jobs:
             -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
 
+          # Prevent keychain from auto-locking during long builds
+          security set-keychain-settings -t 3600 -u "$KEYCHAIN"
+
           security list-keychains -d user -s "$KEYCHAIN"
 
           rm -f "$CERT_FILE"
