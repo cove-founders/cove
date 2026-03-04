@@ -25,43 +25,50 @@ the day (real-time observation), organize during sleep (meditation distillation)
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant C as context.ts
-    participant M as soul-meditate.ts
+    participant R as chat-stream-runner.ts
     participant S as soul.ts
+    participant M as soul-meditate.ts
+    participant C as context.ts
     participant P as post-conversation.ts
     participant O as soul-observe.ts
     participant Sum as summary.ts
     participant A as Archive (SQLite)
 
     Note over U,A: Conversation Start
-    U->>C: Opens conversation
-    C->>S: readSoul()
-    S-->>C: SOUL.md + private/ files
-    C->>M: maybeMeditate()
-    M->>M: Check observation count >= threshold AND cooldown elapsed
-    alt Meditation triggered
+    U->>R: Opens conversation
+    R->>S: readSoul()
+    S-->>R: SOUL.md + private/ files
+    R->>R: soulPrompt = formatSoulPrompt(soul)
+    R-)M: maybeMeditate() [fire-and-forget]
+    Note right of M: Runs async in background.<br/>Current turn uses pre-meditation SOUL.
+    R->>C: buildSystemPrompt(soulPrompt, ...)
+
+    Note over U,A: During Conversation
+    U->>R: Messages exchanged
+
+    par Meditation (background, if triggered)
+        M->>M: Check observation count >= threshold AND cooldown
         M->>S: snapshotSoul()
         M->>M: LLM call (meditation prompt)
         M->>M: Verify DNA + Disposition integrity
         M->>S: writeSoul() + writeSoulPrivate()
+        Note right of M: Updated SOUL visible from next conversation
     end
-    C->>C: buildSystemPrompt(soulPrompt, skills, instructions)
-
-    Note over U,A: During Conversation
-    U->>C: Messages exchanged
 
     Note over U,A: Stream Completion
-    C->>P: runPostConversationTasks()
-    P->>Sum: maybeGenerateSummary() [>= 4 messages]
+    R->>P: runPostConversationTasks()
+    P-)Sum: maybeGenerateSummary() [>= 4 messages, fire-and-forget]
     Sum->>A: INSERT OR REPLACE summary
-    P->>O: maybeRecordObservation() [>= 2 user turns]
+    P-)O: maybeRecordObservation() [>= 2 user turns, fire-and-forget]
     O->>S: writeSoulPrivate("observations.md", ...)
 ```
 
 Key integration points:
+- `chat-stream-runner.ts` -- reads SOUL, fires meditation, builds prompt. Meditation is
+  fire-and-forget: the current conversation uses pre-meditation SOUL; updates take effect
+  from the next conversation.
 - `context.ts:buildSystemPrompt()` -- injects `formatSoulPrompt()` output at the top
 - `post-conversation.ts:runPostConversationTasks()` -- orchestrates fire-and-forget hooks
-- `soul-meditate.ts:maybeMeditate()` -- called before first message in a conversation
 
 ---
 

@@ -217,21 +217,30 @@ were incorporated. No design decisions were dropped or deferred.
 
 ### Meditation output parsing
 
-Meditation relies on the LLM producing output in the exact `=== SOUL.md ===` /
-`=== PRIVATE:{name} ===` format. If the model deviates (e.g., adds preamble before
-the first marker, uses different delimiter syntax), the parser silently returns
-partial or empty results. Meditation completes without error but writes nothing.
+`parseMeditationResult()` uses `indexOf("=== SOUL.md ===")` to find the first marker,
+so leading preamble from the LLM is tolerated. However, these failure modes exist:
 
-Relevant code: `soul-meditate.ts`, `parseMeditationOutput()` function.
+- If the LLM omits the `=== SOUL.md ===` marker entirely, `parseMeditationResult()`
+  returns `null` and meditation silently writes nothing.
+- If the LLM uses a different delimiter syntax (e.g., `--- SOUL.md ---` or markdown
+  code fences), the split on `\n=== ` misses all sections.
+- If `SOUL.md` content after the marker is empty (whitespace only), the function
+  returns `null`.
+
+In all cases meditation completes without throwing -- the snapshot remains as safety net
+but no SOUL update occurs.
+
+Relevant code: `soul-meditate.ts`, `parseMeditationResult()`.
 
 ### Disposition annotation detection
 
-Disposition integrity verification strips trailing ` (annotation)` text via suffix
-matching on ` (`. Nested parentheses in the annotation itself (e.g., `(see also (x))`)
-would cause the stripping to stop at the wrong position, potentially failing the
-integrity check on a valid entry.
+`extractDispositionEntries()` strips trailing annotations by finding the last ` (`
+via `lastIndexOf(" (")`. If the annotation itself contains nested parentheses
+(e.g., `- I lean toward directness (in most contexts (especially code review))`),
+`lastIndexOf` finds the inner `(`, stripping too little. This could cause the
+integrity check to see a different entry text and reject a valid meditation.
 
-Relevant code: `soul-meditate.ts`, `stripAnnotations()`.
+Relevant code: `soul-meditate.ts`, `extractDispositionEntries()`.
 
 ### Observation classification is a soft constraint
 
