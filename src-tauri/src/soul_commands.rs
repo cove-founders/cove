@@ -25,8 +25,8 @@ fn private_dir() -> Result<PathBuf, String> { Ok(soul_dir()?.join("private")) }
 
 fn validate_safe_name(name: &str) -> Result<(), String> {
     if name.is_empty() || name.contains('/') || name.contains('\\')
-        || name.contains("..") || name.starts_with('.') {
-        return Err(format!("Invalid file name: {name}"));
+        || name.contains("..") || name.starts_with('.') || !name.ends_with(".md") {
+        return Err(format!("Invalid file name: {name} (must be *.md, no path traversal)"));
     }
     Ok(())
 }
@@ -198,11 +198,13 @@ mod tests {
     }
 
     #[test]
-    fn private_rejects_traversal() {
+    fn private_rejects_invalid_names() {
         with_home(|_| {
             assert!(write_soul_private("../evil.md".into(), "x".into()).is_err());
             assert!(write_soul_private(".hidden".into(), "x".into()).is_err());
             assert!(write_soul_private("a/b.md".into(), "x".into()).is_err());
+            assert!(write_soul_private("notes.txt".into(), "x".into()).is_err());
+            assert!(write_soul_private("data.json".into(), "x".into()).is_err());
         });
     }
 

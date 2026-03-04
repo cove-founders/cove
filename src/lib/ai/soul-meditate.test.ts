@@ -111,6 +111,20 @@ describe("maybeMeditate", () => {
     );
   });
 
+  it("strips old meditation markers before writing new one", async () => {
+    mockSoul("- a\n- b\n- c");
+    // LLM output contains an old marker (e.g. echoed back from input)
+    const soulWithOldMarker = PUBLIC_SOUL + "\n<!-- last-meditation:2020-01-01T00:00:00Z -->";
+    generateFn.mockResolvedValue(
+      `=== SOUL.md ===\n${soulWithOldMarker}\n\n=== PRIVATE:observations.md ===\n- obs\n`,
+    );
+    await maybeMeditate(generateFn);
+    const written = vi.mocked(writeSoul).mock.calls[0]?.[0] ?? "";
+    const markers = written.match(/<!-- last-meditation:/g) ?? [];
+    expect(markers.length).toBe(1);
+    expect(written).not.toContain("2020-01-01");
+  });
+
   it("handles DELETE markers", async () => {
     mockSoul("- a\n- b\n- c");
     generateFn.mockResolvedValue(
