@@ -84,8 +84,10 @@ node --version   # >= 20
 
 ```bash
 corepack enable
-corepack prepare pnpm@latest --activate
+corepack prepare pnpm@10.28.2 --activate
 ```
+
+`package.json` 的 `packageManager` 字段锁定了项目使用的 pnpm 版本，corepack 会自动遵循。
 
 验证：
 
@@ -154,7 +156,7 @@ gh auth status
 pnpm office-pull
 ```
 
-二进制会下载到 `src-tauri/bin/`。需要 GitHub 仓库的读取权限。
+二进制会下载到 `src-tauri/binaries/`。需要 GitHub 仓库的读取权限。
 
 详细的 officellm 架构说明见 [docs/officellm-dual-track.md](officellm-dual-track.md)。
 
