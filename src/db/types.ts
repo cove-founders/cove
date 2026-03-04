@@ -166,3 +166,16 @@ export interface McpServer {
   enabled: number;
   created_at: string;
 }
+
+export interface SubAgentDef {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+  system_prompt: string;
+  skill_names: string; // JSON array
+  tool_ids: string; // JSON array
+  enabled: number;
+  created_at: string;
+  updated_at: string;
+}

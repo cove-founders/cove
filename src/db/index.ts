@@ -8,6 +8,18 @@ async function runMigrations(database: Database): Promise<void> {
     "ALTER TABLE conversations ADD COLUMN provider_type TEXT",
     "CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(body, conversation_id UNINDEXED, message_id UNINDEXED)",
     "ALTER TABLE conversations ADD COLUMN summary_up_to TEXT",
+    `CREATE TABLE IF NOT EXISTS sub_agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      icon TEXT,
+      system_prompt TEXT DEFAULT '',
+      skill_names TEXT DEFAULT '[]',
+      tool_ids TEXT DEFAULT '[]',
+      enabled INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
   ];
   for (const sql of migrations) {
     try {
