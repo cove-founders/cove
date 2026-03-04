@@ -3,6 +3,17 @@
 This document records the original design conversations that led to the SOUL system.
 Not a technical document -- this is the raw thinking process, preserved as-is.
 
+**Reading guide**:
+- Want to understand **why** SOUL exists and why it's designed this way? Read this document.
+- Want to understand **how** the architecture works? Read `soul-system.md`.
+- Want to modify the code? Read `soul-implementation.md` (file map, gotchas, test inventory).
+
+**TL;DR**: Three sessions shaped the SOUL system. Part 1 established the core thesis
+(SOUL = present self, not memory; three-layer separation; DNA as immutable anchor;
+first-person voice). Part 2 resolved open questions (storage, privacy layer, archive
+retrieval, evolution trigger, no UI for SOUL). Part 3 refined v2 specifics (Disposition/Style
+split, free directory instead of fixed categories, faster cold start, observations inbox pattern).
+
 ---
 
 ## Part 1: 2026-03-01 -- Foundation Discussion

@@ -189,3 +189,137 @@ meditation.
 Schema has `UNIQUE(conversation_id)` constraint. `INSERT OR REPLACE` with
 the existing row's UUID is idempotent -- no separate dedup migration needed.
 Historical duplicates (if any) resolve on next write.
+
+---
+
+## Deviations from Design
+
+Key differences between the v1 design draft, the v2 refinements, and what shipped:
+
+| Area | Design (v1/v2) | Actual Implementation |
+|------|----------------|----------------------|
+| Personality structure | v1: single "Tendencies" section | Shipped: Disposition (high inertia) + Style (low inertia) split, per v2 |
+| Private layer | v1: single `SOUL.private.md` with fixed categories | Shipped: `private/` directory with free file structure, per v2 |
+| Classification | v1: `## Active Observations` / `## Internalized` sections | Shipped: deterministic `observations.md` inbox + meditation-organized files |
+| Observation threshold | v1: 3 user turns | Shipped: 2 user turns (faster signal capture) |
+| First meditation threshold | v1: 5 observations | Shipped: 3 observations (faster first emergence) |
+| Snapshot format | v1: individual files in `soul-history/` | Shipped: directory snapshots in `soul/snapshots/{ts}/` |
+| Meditation output | v1: two markers (PUBLIC/PRIVATE) | Shipped: multi-file markers (`SOUL.md`, `PRIVATE:{name}`, `DELETE:{name}`) |
+| Summary dedup | Not in original design | Added: `runMigrations()` dedup step + durable unique index for legacy tables |
+| Stale summary refresh | Not in original design | Added: cooldown-based refresh when conversation grows to 2x threshold |
+
+All v2 refinements (Disposition/Style split, anti-servility, free directory, cold start)
+were incorporated. No design decisions were dropped or deferred.
+
+---
+
+## Known Limitations
+
+### Meditation output parsing
+
+Meditation relies on the LLM producing output in the exact `=== SOUL.md ===` /
+`=== PRIVATE:{name} ===` format. If the model deviates (e.g., adds preamble before
+the first marker, uses different delimiter syntax), the parser silently returns
+partial or empty results. Meditation completes without error but writes nothing.
+
+Relevant code: `soul-meditate.ts`, `parseMeditationOutput()` function.
+
+### Disposition annotation detection
+
+Disposition integrity verification strips trailing ` (annotation)` text via suffix
+matching on ` (`. Nested parentheses in the annotation itself (e.g., `(see also (x))`)
+would cause the stripping to stop at the wrong position, potentially failing the
+integrity check on a valid entry.
+
+Relevant code: `soul-meditate.ts`, `stripAnnotations()`.
+
+### Observation classification is a soft constraint
+
+The observation prompt instructs cove to only record identity/relationship observations
+and skip technical preferences. This is LLM instruction, not programmatic enforcement.
+The model may occasionally write technical observations (e.g., "user prefers Rust over
+Python") that belong in Skill memory, not SOUL.
+
+### Snapshot retention is fixed
+
+`snapshot_soul()` prunes to the most recent 20 snapshots. No configuration option.
+For users with frequent meditation cycles, 20 snapshots covers ~20 days of history.
+Earlier states are unrecoverable.
+
+### No conflict resolution for concurrent writes
+
+`writeSoulPrivate()` does not lock files. If two operations (e.g., observation + meditation)
+write simultaneously, the last writer wins. In practice this is unlikely because meditation
+runs at conversation start and observation runs at conversation end, but the race condition
+exists in theory.
+
+### Summary FTS ranking is basic
+
+`recall` uses SQLite FTS5 default ranking (BM25). No tuning of term weights, no boosting
+by recency. For large conversation archives, search quality may degrade.
+
+---
+
+## Testing Status
+
+### Test file inventory
+
+| Test file | Lines | Covers |
+|-----------|-------|--------|
+| `src/lib/ai/soul.test.ts` | 69 | `readSoul`, `writeSoul`, `formatSoulPrompt`, private file operations |
+| `src/lib/ai/soul-meditate.test.ts` | 208 | Threshold logic, cooldown, DNA integrity, Disposition integrity, output parsing, snapshot creation |
+| `src/lib/ai/soul-observe.test.ts` | 101 | Turn counting, date dedup, observation appending, classification boundary |
+| `src/lib/ai/summary.test.ts` | 119 | Summary generation threshold, stale detection, cooldown, INSERT OR REPLACE |
+| `src/lib/ai/post-conversation.test.ts` | 79 | Task orchestration, fire-and-forget error isolation |
+| `src/lib/ai/context.test.ts` | 109 | System prompt assembly, SOUL injection ordering |
+| `src/lib/ai/tools/recall.test.ts` | 72 | FTS search, recall_detail message retrieval |
+| `src/db/repos/summaryRepo.test.ts` | 159 | CRUD operations, unique constraint, dedup migration |
+
+### Verification commands
+
+```bash
+# Run all SOUL-related tests
+pnpm test -- src/lib/ai/soul.test.ts src/lib/ai/soul-meditate.test.ts src/lib/ai/soul-observe.test.ts src/lib/ai/summary.test.ts src/lib/ai/post-conversation.test.ts src/lib/ai/context.test.ts src/lib/ai/tools/recall.test.ts src/db/repos/summaryRepo.test.ts
+
+# TypeScript type check (catches type errors across SOUL modules)
+pnpm run build
+
+# Rust layer check (soul_commands.rs, soul_migrate.rs, soul_defaults.rs)
+cd src-tauri && cargo check
+
+# File size compliance
+python3 scripts/check-file-size.py
+```
+
+### Not covered by automated tests
+
+- Rust layer (`soul_commands.rs`, `soul_migrate.rs`) -- no Rust unit tests; verified
+  manually through `pnpm tauri dev` and filesystem inspection
+- End-to-end meditation flow (requires actual LLM call) -- tested manually
+- Legacy migration path (old `SOUL.md` / `SOUL.private.md` structure) -- tested manually
+  during PR #230 development
+
+---
+
+## Follow-up Roadmap
+
+Extracted from Epic #219 discussion and design conversation:
+
+1. **Meditation quality monitoring** -- Log meditation input/output pairs for offline
+   evaluation. Track how often integrity checks fail and why.
+
+2. **Observation routing refinement** -- Currently all observations go to `observations.md`.
+   Future: meditation could establish routing rules (e.g., "relationship observations go to
+   relationship.md") that the observation step follows.
+
+3. **Configurable snapshot retention** -- Allow users to set snapshot count (currently
+   hardcoded to 20) via settings.
+
+4. **Recall ranking improvements** -- Boost recent conversations in FTS ranking. Consider
+   adding a date-weighted scoring function.
+
+5. **Multi-profile support** -- One SOUL per user profile (`~/.cove/profiles/{user}/soul/`).
+   Currently single-user bound to installation.
+
+6. **SOUL health diagnostics** -- Dev-mode dashboard showing observation count, meditation
+   history, Disposition drift over time. Not a user-facing feature.
