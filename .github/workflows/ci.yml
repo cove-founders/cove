@@ -46,7 +46,7 @@ jobs:
         run: pnpm run build
 
       - name: Test
-        run: pnpm test
+        run: pnpm test:coverage
 
       - name: Cargo check
         run: cd src-tauri && cargo check
