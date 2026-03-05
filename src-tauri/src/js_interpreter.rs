@@ -258,7 +258,7 @@ fn register_workspace_fns<'js>(
                         crate::officellm::server::call(&cmd, &cli_args)
                             .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
                     } else {
-                        crate::officellm::cli::call(&cmd, &cli_args, home)
+                        crate::officellm::cli::call(&cmd, &cli_args, home, std::path::Path::new(&wr4))
                             .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
                     };
                     r

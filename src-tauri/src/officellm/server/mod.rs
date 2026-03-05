@@ -67,6 +67,11 @@ pub fn open(path: &str, home: &std::path::Path) -> Result<(), String> {
         .stderr(Stdio::piped());
     super::env::apply_env(&mut cmd, home);
 
+    let doc_dir = std::path::Path::new(path)
+        .parent()
+        .unwrap_or(std::path::Path::new("/"));
+    cmd.current_dir(doc_dir);
+
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("启动 officellm serve 失败: {e}"))?;
