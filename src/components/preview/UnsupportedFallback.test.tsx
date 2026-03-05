@@ -174,6 +174,20 @@ describe("UnsupportedFallback file stat display", () => {
     expect(vi.mocked(invoke)).not.toHaveBeenCalled();
   });
 
+  it("clears stale stat when switching to absolute path", async () => {
+    // First render with workspace-relative path that resolves stat
+    const { unmount } = renderFallback("archive.zip", "/workspace");
+    await waitFor(() => {
+      expect(screen.getByText("1.0 KB")).toBeDefined();
+    });
+    unmount();
+
+    // Re-render with absolute path — stale stat should be cleared
+    renderFallback("/Users/data/attachments/other.zip", "/workspace");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("1.0 KB")).toBeNull();
+  });
+
   it("does not crash when invoke rejects", async () => {
     vi.mocked(invoke).mockRejectedValue(new Error("Permission denied"));
 

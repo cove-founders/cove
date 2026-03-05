@@ -39,10 +39,13 @@ export function UnsupportedFallback({ path, workspaceRoot, onOpenExternal }: Uns
 
   useEffect(() => {
     // stat_file requires workspace-relative paths; skip for absolute paths
-    if (!workspaceRoot || path.startsWith("/")) return;
+    if (!workspaceRoot || path.startsWith("/")) {
+      setStat(null);
+      return;
+    }
     invoke<StatResult>("stat_file", { args: { workspaceRoot, path } })
       .then(setStat)
-      .catch(() => {});
+      .catch(() => setStat(null));
   }, [path, workspaceRoot]);
 
   return (
