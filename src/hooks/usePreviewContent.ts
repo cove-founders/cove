@@ -1,14 +1,38 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { useFilePreviewStore } from "@/stores/filePreviewStore";
 import { getPreviewKind } from "@/lib/preview-types";
 
-export function isTextKind(k: string): k is "txt" | "md" | "code" {
-  return k === "txt" || k === "md" || k === "code";
+export function isTextKind(k: string): k is "txt" | "md" | "code" | "csv" | "html" {
+  return k === "txt" || k === "md" || k === "code" || k === "csv" || k === "html";
 }
 
 export function isDataUrlKind(k: string): k is "image" | "pdf" | "office" {
   return k === "image" || k === "pdf" || k === "office";
+}
+
+function isAbsolutePath(p: string): boolean {
+  return p.startsWith("/");
+}
+
+async function loadAbsoluteAsText(path: string): Promise<string> {
+  const url = convertFileSrc(path);
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Failed to read file: ${resp.statusText}`);
+  return resp.text();
+}
+
+async function loadAbsoluteAsDataUrl(path: string): Promise<string> {
+  const url = convertFileSrc(path);
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Failed to read file: ${resp.statusText}`);
+  const blob = await resp.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("FileReader failed"));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function usePreviewContent(path: string | null, workspaceRoot: string | null) {
@@ -19,11 +43,15 @@ export function usePreviewContent(path: string | null, workspaceRoot: string | n
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!path || !workspaceRoot) {
+    if (!path) {
       setError(null);
       return;
     }
-    /* 从 store 快照读取，避免把 contentCache 放进 deps 导致无限循环 */
+    const abs = isAbsolutePath(path);
+    if (!abs && !workspaceRoot) {
+      setError(null);
+      return;
+    }
     const cached = useFilePreviewStore.getState().contentCache[path];
     if (cached) {
       setLoading(false);
@@ -40,7 +68,7 @@ export function usePreviewContent(path: string | null, workspaceRoot: string | n
         msg = e;
       } else if (e && typeof e === "object") {
         const fe = e as { kind?: string; message?: string };
-        msg = fe.message || fe.kind || "读取失败";
+        msg = fe.message || fe.kind || "Failed to load";
       } else {
         msg = String(e);
       }
@@ -50,15 +78,23 @@ export function usePreviewContent(path: string | null, workspaceRoot: string | n
     };
 
     if (isTextKind(kind)) {
-      invoke<string>("read_file_raw", { args: { workspaceRoot, path } })
+      const promise = abs
+        ? loadAbsoluteAsText(path)
+        : invoke<string>("read_file_raw", { args: { workspaceRoot, path } });
+      promise
         .then((text) => {
           setContent(path, { path, type: "text", text, mtime: Date.now() });
         })
         .catch(handleError)
         .finally(() => setLoading(false));
     } else if (isDataUrlKind(kind)) {
-      invoke<{ dataUrl: string }>("read_file_as_data_url", { args: { workspaceRoot, path } })
-        .then(({ dataUrl }) => {
+      const promise = abs
+        ? loadAbsoluteAsDataUrl(path)
+        : invoke<{ dataUrl: string }>("read_file_as_data_url", {
+            args: { workspaceRoot, path },
+          }).then((r) => r.dataUrl);
+      promise
+        .then((dataUrl) => {
           setContent(path, { path, type: "dataUrl", dataUrl, mtime: Date.now() });
         })
         .catch(handleError)
