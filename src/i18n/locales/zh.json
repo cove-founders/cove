@@ -138,7 +138,10 @@
     "docxRenderError": "DOCX 渲染失败",
     "pageNumber": "第 {{current}} / {{total}} 页",
     "searchPlaceholder": "过滤文件\u2026",
-    "searchFiles": "搜索文件"
+    "searchFiles": "搜索文件",
+    "csvRows": "行",
+    "csvCols": "列",
+    "csvTruncated": "显示 {{rows}} 行 x {{cols}} 列"
   },
   "common": {
     "settings": "设置"

@@ -80,7 +80,7 @@ export function ChatInput({
     [mentionQuery],
   );
   const filteredSkills = useMemo(
-    () => mentionQuery ? allSkillMetas.filter((s) => s.name.includes(mentionQuery)) : allSkillMetas,
+    () => mentionQuery ? allSkillMetas.filter((s) => s.name.toLowerCase().includes(mentionQuery)) : allSkillMetas,
     [mentionQuery, allSkillMetas],
   );
   const mentionFiles = useMentionFiles(activeWorkspace?.path ?? null, mentionQuery, mentionState.open);
@@ -93,11 +93,15 @@ export function ChatInput({
     const cursorPos = textareaRef.current?.selectionStart ?? message.length;
     const { newMessage, newCursorPos } = insertMention(message, cursorPos, type, id);
     setMessage(newMessage);
+    // Explicitly sync mention detection state after programmatic text change.
+    // Without this, the next @ may not trigger the popover because onChange
+    // doesn't fire for programmatic setMessage updates.
+    updateMention(newMessage, newCursorPos);
     requestAnimationFrame(() => {
       textareaRef.current?.setSelectionRange(newCursorPos, newCursorPos);
       textareaRef.current?.focus();
     });
-  }, [message, insertMention]);
+  }, [message, insertMention, updateMention]);
 
   // --- /slash commands ---
   const skillNames = useMemo(() => {
@@ -136,7 +140,7 @@ export function ChatInput({
 
   useEffect(() => { const el = textareaRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }, [message]);
 
-  const handleAttachFiles = async () => { await pickAndSaveAttachments(addDraftAttachments, setAttachError); };
+  const handleAttachFiles = async () => { await pickAndSaveAttachments(addDraftAttachments, setAttachError, activeWorkspace?.path); };
 
   const handleSend = () => {
     if (!canSend) return;
@@ -152,14 +156,15 @@ export function ChatInput({
     for (let i = 0; i < items.length; i++) { const item = items[i]; if (item?.kind === "file") { const f = item.getAsFile(); if (f && isImageFile(f)) files.push(f); } }
     if (files.length === 0) return;
     e.preventDefault();
-    const attachments = await imageFilesToDraftAttachments(files);
+    const attachments = await imageFilesToDraftAttachments(files, activeWorkspace?.path);
     if (attachments.length > 0) { addDraftAttachments(attachments); setAttachError(null); }
   };
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation();
     const files = e.dataTransfer?.files; if (!files?.length) return;
-    const all = [...(await imageFilesToDraftAttachments(Array.from(files))), ...(await nonImageFilesToDraftAttachments(Array.from(files)))];
+    const wsPath = activeWorkspace?.path;
+    const all = [...(await imageFilesToDraftAttachments(Array.from(files), wsPath)), ...(await nonImageFilesToDraftAttachments(Array.from(files), wsPath))];
     if (all.length > 0) { addDraftAttachments(all); setAttachError(null); }
   };
 

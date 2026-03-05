@@ -138,7 +138,10 @@
     "docxRenderError": "Failed to render DOCX",
     "pageNumber": "Page {{current}} / {{total}}",
     "searchPlaceholder": "Filter files\u2026",
-    "searchFiles": "Search files"
+    "searchFiles": "Search files",
+    "csvRows": "rows",
+    "csvCols": "columns",
+    "csvTruncated": "showing {{rows}} rows x {{cols}} columns"
   },
   "common": {
     "settings": "Settings"

@@ -14,8 +14,7 @@ Help users report bugs, request features, or submit general feedback for Cove.
 
 ## Channels
 
-1. GitHub Issues — https://github.com/nicepkg/cove/issues (bugs and feature requests)
-2. Email — cove@nicepkg.cn (general feedback)
+- GitHub Issues — https://github.com/cove-founders/cove/issues (bugs and feature requests)
 
 ## Bug Report Template
 
@@ -82,10 +81,10 @@ Use `bash` tool to check if `gh` is available:
 command -v gh && gh auth status
 ```
 
-- If `gh` is installed and authenticated: submit directly with `gh issue create --repo nicepkg/cove --title "..." --body "..."`. Show the resulting issue URL.
+- If `gh` is installed and authenticated: submit directly with `gh issue create --repo cove-founders/cove --title "..." --body "..."`. Show the resulting issue URL.
 - If `gh` is installed but not authenticated: run `gh auth login` and guide the user through authentication, then submit.
 - If `gh` is not installed: ask the user if they want to install it (`brew install gh` on macOS, or see https://cli.github.com). If they decline, provide the manual link below.
 
 ### Manual fallback
 
-If the user cannot or does not want to use `gh`, provide the formatted content and link: https://github.com/nicepkg/cove/issues/new
+If the user cannot or does not want to use `gh`, provide the formatted content and link: https://github.com/cove-founders/cove/issues/new

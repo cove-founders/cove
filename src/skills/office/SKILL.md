@@ -1,5 +1,5 @@
 ---
-name: office
+name: OfficeLLM
 description: Bootstrap for bundled office tool — Tauri tool for document operations (DOCX/PPTX/XLSX).
 emoji: "📄"
 always: false
@@ -11,15 +11,13 @@ ALWAYS use the `office` Tauri tool for document operations. Do NOT use `bash` to
 
 ## Loading the Full Command Reference
 
-This built-in skill is a **bootstrap**. For the complete command reference (~100 commands, workflows, best practices):
+Run `doctor` first — the response includes a `home` field. For the complete command reference (~100 commands, workflows, best practices):
 
-1. Call the `skill` tool with `name: "OfficeLLM"`.
-2. Run `doctor` first — the response includes a `home` field. Resources are at:
-   - `<home>/skills/resources/*.md` — detailed guides
-   - `<home>/skills/quickjs-examples/*.js` — scripting examples
-   - Use the `read` tool to load a specific guide on demand.
+- `<home>/skills/resources/*.md` — detailed guides
+- `<home>/skills/quickjs-examples/*.js` — scripting examples
+- Use the `read` tool to load a specific guide on demand.
 
-Do NOT guess command names — always load the full skill first.
+Do NOT guess command names — read the resource guides first.
 
 ## Dependency Check
 
@@ -49,7 +47,7 @@ Use `bash` tool for install commands. Re-run `doctor` to confirm.
 
 ## Quick Reference (Common Operations)
 
-These examples work without loading the full OfficeLLM skill. Use the `office` Tauri tool or `cove_interpreter` with `workspace.officellm()`.
+These examples work without loading the full OfficeLLM skill. Prefer the `office` Tauri tool for single operations. Use `cove_interpreter` with `workspace.officellm()` only for multi-step programmatic workflows.
 
 ### Extract text from a document
 
@@ -57,7 +55,7 @@ These examples work without loading the full OfficeLLM skill. Use the `office` T
 { "action": "call", "command": "extract-text", "args": { "i": "report.docx" } }
 ```
 
-Or via `cove_interpreter`:
+For multi-step processing, use `cove_interpreter`:
 
 ```javascript
 const res = JSON.parse(workspace.officellm("extract-text", { i: "report.docx" }));
@@ -70,7 +68,7 @@ console.log(res.data.text);
 { "action": "call", "command": "replace-text", "args": { "i": "doc.docx", "o": "doc-out.docx", "find": "old text", "replace": "new text" } }
 ```
 
-### Server mode (multiple operations on one document)
+### Server mode via cove_interpreter (multiple operations on one document)
 
 ```javascript
 workspace.officellm("open", { path: "presentation.pptx" });
@@ -85,4 +83,4 @@ workspace.officellm("close", {});
 { "action": "status" }
 ```
 
-For the full command reference (~100 commands), load the OfficeLLM skill via the `skill` tool.
+For the full command reference (~100 commands), run `doctor` and read the resource guides at `<home>/skills/resources/`.

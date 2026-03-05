@@ -11,9 +11,10 @@
  */
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
+import { PdfPage } from "./PdfPage";
 
 // ── pdf.js worker（Vite 打包为独立 chunk，避免主线程阻塞）──────────────────
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -22,78 +23,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 // ── L1 内存缓存（按命令名隔离，session 内永久有效）──────────────────────────
-// key: `${command}:${dataUrl.length}:${dataUrl.slice(0, 64)}`
-// value: 转换后的 PDF data-URL
 const memCache = new Map<string, string>();
 
 function cacheKey(command: string, dataUrl: string): string {
   return `${command}:${dataUrl.length}:${dataUrl.slice(0, 64)}`;
-}
-
-// ── 单页 canvas 渲染 ──────────────────────────────────────────────────────────
-interface PdfPageProps {
-  doc: PDFDocumentProxy;
-  pageNum: number;
-  width: number;
-}
-
-function PdfPage({ doc, pageNum, width }: PdfPageProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (width <= 0) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    let cancelled = false;
-    let renderTask: RenderTask | null = null;
-
-    doc
-      .getPage(pageNum)
-      .then((page) => {
-        if (cancelled) {
-          page.cleanup();
-          return;
-        }
-
-        const baseVp = page.getViewport({ scale: 1 });
-        const scale = width / baseVp.width;
-        const vp = page.getViewport({ scale });
-        const dpr = window.devicePixelRatio || 1;
-
-        canvas.width = Math.floor(vp.width * dpr);
-        canvas.height = Math.floor(vp.height * dpr);
-        canvas.style.width = `${vp.width}px`;
-        canvas.style.height = `${vp.height}px`;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx || cancelled) return;
-        ctx.scale(dpr, dpr);
-
-        renderTask = page.render({ canvasContext: ctx, viewport: vp, canvas });
-        return renderTask.promise.then(() => page.cleanup());
-      })
-      .catch(() => {
-        // 忽略 cancel() 产生的错误
-      });
-
-    return () => {
-      cancelled = true;
-      renderTask?.cancel();
-    };
-  }, [doc, pageNum, width]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        display: "block",
-        background: "#fff",
-        borderRadius: 3,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.06)",
-      }}
-    />
-  );
 }
 
 // ── 主组件 ────────────────────────────────────────────────────────────────────

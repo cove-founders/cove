@@ -1,9 +1,9 @@
 /** 根据扩展名判断预览类型 */
-export type PreviewKind = "txt" | "md" | "code" | "image" | "pdf" | "office" | "unsupported";
+export type PreviewKind = "txt" | "md" | "code" | "csv" | "html" | "image" | "pdf" | "office" | "unsupported";
 
 const CODE_EXTS = new Set([
   "js", "jsx", "ts", "tsx", "mjs", "cjs",
-  "py", "rs", "go", "html", "htm", "css", "scss", "less",
+  "py", "rs", "go", "css", "scss", "less",
   "json", "yaml", "yml", "xml", "md", "sh", "bash", "zsh",
   "sql", "graphql", "vue", "svelte",
 ]);
@@ -16,11 +16,13 @@ export function getPreviewKind(path: string): PreviewKind {
   const ext = path.replace(/^.*\./, "").toLowerCase();
   if (!ext) return "txt";
   if (ext === "md" || ext === "markdown" || ext === "qmd") return "md";
+  if (ext === "csv") return "csv";
+  if (ext === "html" || ext === "htm") return "html";
   if (ext === "pdf") return "pdf";
   if (OFFICE_EXTS.has(ext)) return "office";
   if (IMAGE_EXTS.has(ext)) return "image";
   if (CODE_EXTS.has(ext)) return "code";
-  if (ext === "txt" || ext === "log" || ext === "csv") return "txt";
+  if (ext === "txt" || ext === "log") return "txt";
   return "unsupported";
 }
 

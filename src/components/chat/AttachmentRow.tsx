@@ -1,13 +1,64 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import type { KeyboardEvent } from "react";
 import type { Attachment } from "@/db/types";
+import { useFilePreviewStore } from "@/stores/filePreviewStore";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { FileTypeBadge, getAttachmentPreviewSrc } from "./AttachmentVisual";
+
+function useOpenAttachmentPreview() {
+  const setSelected = useFilePreviewStore((s) => s.setSelected);
+  const setContent = useFilePreviewStore((s) => s.setContent);
+  const setFilePanelOpen = useLayoutStore((s) => s.setFilePanelOpen);
+
+  return useCallback(
+    (attachment: Attachment) => {
+      const path = attachment.path ?? attachment.name ?? "";
+      if (!path) return;
+
+      // Pre-cache content if available (e.g. image data URL)
+      if (attachment.content) {
+        const isImage = attachment.content.startsWith("data:image/");
+        setContent(path, {
+          path,
+          type: isImage ? "dataUrl" : "text",
+          dataUrl: isImage ? attachment.content : undefined,
+          text: isImage ? undefined : attachment.content,
+          mtime: Date.now(),
+        });
+      }
+
+      setSelected(path);
+
+      if (!useLayoutStore.getState().filePanelOpen) {
+        setFilePanelOpen(true);
+      }
+    },
+    [setSelected, setContent, setFilePanelOpen],
+  );
+}
 
 export function UserAttachmentItem({ attachment }: { attachment: Attachment }) {
   const [imageFailed, setImageFailed] = useState(false);
   const previewSrc = getAttachmentPreviewSrc(attachment);
   const showImage = !!previewSrc && !imageFailed;
+  const openPreview = useOpenAttachmentPreview();
+
+  const handleClick = () => openPreview(attachment);
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openPreview(attachment);
+    }
+  };
+
   return (
-    <div className="inline-flex max-w-[260px] items-center gap-2 rounded-md border border-border bg-background-secondary px-2 py-1">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      className="inline-flex max-w-[260px] cursor-pointer items-center gap-2 rounded-md border border-border bg-background-secondary px-2 py-1 transition-colors hover:border-accent/50 hover:bg-background-tertiary"
+    >
       {showImage ? (
         <img
           src={previewSrc}
