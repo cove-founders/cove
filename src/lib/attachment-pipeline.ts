@@ -71,6 +71,11 @@ export async function processAttachment(
     draft.content = saved.previewDataUrl;
     draft.status = "processing";
 
+    // For PDFs, load data URL for native PDF model support
+    if (!draft.content && draft.mime_type === "application/pdf") {
+      draft.content = await loadPdfDataUrl(saved.path, workspacePath);
+    }
+
     // Preprocess for text extraction
     const preprocessed = await preprocess(saved.path);
     if (preprocessed) {
@@ -128,6 +133,12 @@ export async function processAttachmentFromBase64(
     draft.content = saved.previewDataUrl;
     draft.status = "processing";
 
+    // For PDFs, construct data URL from the original base64 for native PDF support
+    const resolvedMime = draft.mime_type;
+    if (!draft.content && resolvedMime === "application/pdf" && base64) {
+      draft.content = `data:application/pdf;base64,${base64}`;
+    }
+
     const preprocessed = await preprocess(saved.path);
     if (preprocessed) {
       draft.parsed_content = preprocessed.content;
@@ -150,5 +161,25 @@ async function preprocess(path: string): Promise<PreprocessResult | null> {
     });
   } catch {
     return null;
+  }
+}
+
+async function loadPdfDataUrl(
+  filePath: string,
+  workspacePath: string | undefined,
+): Promise<string | undefined> {
+  try {
+    if (workspacePath) {
+      const result = await invoke<{ dataUrl: string }>("read_file_as_data_url", {
+        args: { workspaceRoot: workspacePath, path: filePath },
+      });
+      return result.dataUrl;
+    }
+    const result = await invoke<{ dataUrl: string }>("read_attachment_as_data_url", {
+      args: { path: filePath },
+    });
+    return result.dataUrl;
+  } catch {
+    return undefined;
   }
 }

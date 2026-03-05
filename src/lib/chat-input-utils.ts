@@ -49,6 +49,7 @@ export async function imageFilesToDraftAttachments(
         const draft = await processAttachmentFromBase64(
           file.name || "image.png", base64, workspacePath, file.type,
         );
+        if (draft.status === "error") continue;
         // Ensure image has data URL content for vision models
         if (!draft.content?.startsWith("data:image/")) {
           draft.content = await fileToDataUrl(file);
@@ -91,7 +92,7 @@ export async function nonImageFilesToDraftAttachments(
       const draft = await processAttachmentFromBase64(
         file.name || "file", base64, workspacePath, file.type || undefined,
       );
-      attachments.push(draft);
+      if (draft.status !== "error") attachments.push(draft);
     } catch {
       // Skip failed individual files
     }

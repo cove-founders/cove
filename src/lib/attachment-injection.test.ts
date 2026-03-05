@@ -164,16 +164,29 @@ describe("buildAttachmentInjection", () => {
       expect(result.textBlock).toContain("```\nPDF text content\n```");
     });
 
-    it("skips native part when no PDF data URL", () => {
+    it("falls through to text injection when no PDF data URL on native model", () => {
       const pdf = makeDraft({
         type: "pdf", name: "report.pdf",
         content: "data:image/png;base64,notpdf",
+        workspace_path: "/ws/report_123.pdf",
+        parsed_content: "Extracted PDF text",
+      });
+      const result = buildAttachmentInjection([pdf], pdfNativeOpts);
+
+      expect(result.pdfParts).toHaveLength(0);
+      expect(result.textBlock).toContain("[Attachment: report.pdf at /ws/report_123.pdf]");
+      expect(result.textBlock).toContain("```\nExtracted PDF text\n```");
+    });
+
+    it("falls through to read-tool hint when no data URL and no parsed content", () => {
+      const pdf = makeDraft({
+        type: "pdf", name: "report.pdf",
         workspace_path: "/ws/report_123.pdf",
       });
       const result = buildAttachmentInjection([pdf], pdfNativeOpts);
 
       expect(result.pdfParts).toHaveLength(0);
-      expect(result.textBlock).toContain("[PDF: report.pdf at /ws/report_123.pdf]");
+      expect(result.textBlock).toContain("use `read` tool to view content");
     });
   });
 

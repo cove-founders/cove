@@ -21,7 +21,8 @@ export async function pickAndSaveAttachments(
     await Promise.all(
       supportedPaths.map(async (sourcePath): Promise<DraftAttachment | null> => {
         try {
-          return await processAttachment(sourcePath, workspacePath);
+          const draft = await processAttachment(sourcePath, workspacePath);
+          return draft.status === "error" ? null : draft;
         } catch {
           return null;
         }

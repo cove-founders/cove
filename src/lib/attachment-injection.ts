@@ -90,9 +90,10 @@ function handlePdf(
       : undefined;
     if (dataUrl) {
       pdfParts.push({ type: "file", data: dataUrl, mediaType: "application/pdf" });
+      textBlocks.push(`[PDF: ${a.name ?? "document"} at ${pathInfo}]`);
+      return;
     }
-    textBlocks.push(`[PDF: ${a.name ?? "document"} at ${pathInfo}]`);
-    return;
+    // No PDF data URL available -- fall through to text-based injection
   }
 
   handleDocument(a, threshold, textBlocks);

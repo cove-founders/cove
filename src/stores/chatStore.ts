@@ -165,6 +165,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     let conversationId: string;
     let updatedMessages: Message[];
     let isNewConversation = false;
+    // Filter out failed attachments before persisting and injecting
+    const readyAttachments = draftAttachments.filter((a) => a.status !== "error");
     try {
       conversationId = dataStore.activeConversationId ?? "";
       if (!conversationId) {
@@ -184,8 +186,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         id: crypto.randomUUID(), conversation_id: conversationId, role: "user", content: trimmedContent,
       };
       await messageRepo.create(userMsg);
-      if (draftAttachments.length > 0) {
-        await Promise.all(draftAttachments.map(async (a) => attachmentRepo.create({
+      if (readyAttachments.length > 0) {
+        await Promise.all(readyAttachments.map(async (a) => attachmentRepo.create({
           id: a.id, message_id: userMsg.id, type: a.type, name: a.name,
           path: a.path, mime_type: a.mime_type, size: a.size, content: a.content,
           workspace_path: a.workspace_path, parsed_content: a.parsed_content, parsed_summary: a.parsed_summary,
@@ -195,9 +197,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       updatedMessages = [...messages, { ...userMsg, created_at: new Date().toISOString() }];
       set((state) => ({
         messages: updatedMessages, draftAttachments: [],
-        attachmentsByMessage: draftAttachments.length === 0 ? state.attachmentsByMessage : {
+        attachmentsByMessage: readyAttachments.length === 0 ? state.attachmentsByMessage : {
           ...state.attachmentsByMessage,
-          [userMsg.id]: draftAttachments.map((a) => ({ ...a, message_id: userMsg.id, created_at: new Date().toISOString() })),
+          [userMsg.id]: readyAttachments.map((a) => ({ ...a, message_id: userMsg.id, created_at: new Date().toISOString() })),
         },
         error: null,
       }));
@@ -225,12 +227,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const fetchBlock = await getFetchBlockForText(trimmedContent);
 
-      if (draftAttachments.length > 0) {
+      if (readyAttachments.length > 0) {
         const latestUserIndex = [...modelMessages].reverse().findIndex((m) => m.role === "user");
         if (latestUserIndex >= 0) {
           const index = modelMessages.length - 1 - latestUserIndex;
           const modelSupportsVision = modelOption?.vision === true || modelOption?.image_in === true;
-          const injection = buildAttachmentInjection(draftAttachments, { modelSupportsVision, modelSupportsPdfNative });
+          const injection = buildAttachmentInjection(readyAttachments, { modelSupportsVision, modelSupportsPdfNative });
           const userText = `${trimmedContent}${injection.textBlock}${fetchBlock}`.trim();
           const nextContent: UserContent = [];
           if (userText) nextContent.push({ type: "text", text: userText });

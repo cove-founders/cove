@@ -23,6 +23,7 @@ describe("processAttachment", () => {
   it("saves to workspace and preprocesses when workspace is set", async () => {
     mockInvoke
       .mockResolvedValueOnce({ path: "/ws/report_123.pdf", name: "report.pdf", size: 5000, relativePath: "report_123.pdf" })
+      .mockResolvedValueOnce({ dataUrl: "data:application/pdf;base64,pdfdata" }) // read_file_as_data_url for PDF
       .mockResolvedValueOnce({ fileType: "pdf", content: "PDF text", summary: "PDF text", charCount: 8, truncated: false, warnings: [], metadata: {} });
 
     const result = await processAttachment("/tmp/report.pdf", "/ws");
@@ -38,6 +39,7 @@ describe("processAttachment", () => {
   it("falls back to app data dir when no workspace", async () => {
     mockInvoke
       .mockResolvedValueOnce({ path: "/app/attachments/report_123.pdf", name: "report.pdf", size: 5000 })
+      .mockResolvedValueOnce({ dataUrl: "data:application/pdf;base64,pdfdata" }) // read_attachment_as_data_url for PDF
       .mockResolvedValueOnce({ fileType: "pdf", content: "text", summary: "text", charCount: 4, truncated: false, warnings: [], metadata: {} });
 
     const result = await processAttachment("/tmp/report.pdf", undefined);
@@ -77,6 +79,44 @@ describe("processAttachment", () => {
     expect(result.type).toBe("image");
     expect(result.content).toBe("data:image/png;base64,abc");
   });
+
+  it("loads PDF data URL via read_file_as_data_url for workspace PDFs", async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ path: "/ws/report_123.pdf", name: "report.pdf", size: 5000, relativePath: "report_123.pdf" })
+      .mockResolvedValueOnce({ dataUrl: "data:application/pdf;base64,pdfdata" }) // read_file_as_data_url
+      .mockResolvedValueOnce({ fileType: "pdf", content: "text", summary: "text", charCount: 4, truncated: false, warnings: [], metadata: {} });
+
+    const result = await processAttachment("/tmp/report.pdf", "/ws");
+
+    expect(mockInvoke).toHaveBeenCalledWith("read_file_as_data_url", { args: { workspaceRoot: "/ws", path: "/ws/report_123.pdf" } });
+    expect(result.content).toBe("data:application/pdf;base64,pdfdata");
+    expect(result.status).toBe("ready");
+  });
+
+  it("loads PDF data URL via read_attachment_as_data_url for app-data PDFs", async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ path: "/app/attachments/report_123.pdf", name: "report.pdf", size: 5000 })
+      .mockResolvedValueOnce({ dataUrl: "data:application/pdf;base64,pdfdata" }) // read_attachment_as_data_url
+      .mockResolvedValueOnce({ fileType: "pdf", content: "text", summary: "text", charCount: 4, truncated: false, warnings: [], metadata: {} });
+
+    const result = await processAttachment("/tmp/report.pdf", undefined);
+
+    expect(mockInvoke).toHaveBeenCalledWith("read_attachment_as_data_url", { args: { path: "/app/attachments/report_123.pdf" } });
+    expect(result.content).toBe("data:application/pdf;base64,pdfdata");
+  });
+
+  it("continues without PDF data URL when loading fails", async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ path: "/ws/report_123.pdf", name: "report.pdf", size: 5000, relativePath: "report_123.pdf" })
+      .mockRejectedValueOnce(new Error("Too large")) // read_file_as_data_url fails
+      .mockResolvedValueOnce({ fileType: "pdf", content: "text", summary: "text", charCount: 4, truncated: false, warnings: [], metadata: {} });
+
+    const result = await processAttachment("/tmp/report.pdf", "/ws");
+
+    expect(result.status).toBe("ready");
+    expect(result.content).toBeUndefined();
+    expect(result.parsed_content).toBe("text");
+  });
 });
 
 describe("processAttachmentFromBase64", () => {
@@ -112,5 +152,16 @@ describe("processAttachmentFromBase64", () => {
 
     expect(result.status).toBe("error");
     expect(result.error).toBe("Disk full");
+  });
+
+  it("constructs PDF data URL from original base64", async () => {
+    mockInvoke
+      .mockResolvedValueOnce({ path: "/ws/report_123.pdf", name: "report.pdf", size: 5000, relativePath: "report_123.pdf" })
+      .mockResolvedValueOnce({ fileType: "pdf", content: "text", summary: "text", charCount: 4, truncated: false, warnings: [], metadata: {} });
+
+    const result = await processAttachmentFromBase64("report.pdf", "pdfbase64data", "/ws");
+
+    expect(result.content).toBe("data:application/pdf;base64,pdfbase64data");
+    expect(result.status).toBe("ready");
   });
 });

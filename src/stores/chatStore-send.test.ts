@@ -179,6 +179,18 @@ describe("chatStore — sendMessage", () => {
       const abm = useChatStore.getState().attachmentsByMessage;
       expect(Object.keys(abm).length).toBeGreaterThan(0);
     });
+
+    it("filters out error-status draft attachments before persisting", async () => {
+      setupDefaultMocks();
+      const good: DraftAttachment = { id: "a1", type: "file", name: "ok.txt", status: "ready" };
+      const bad: DraftAttachment = { id: "a2", type: "file", name: "fail.txt", status: "error", error: "save failed" };
+      setStoreState(useChatStore, { ...useChatStore.getState(), draftAttachments: [good, bad] });
+      await useChatStore.getState().sendMessage("hello");
+      expect(attachmentRepo.create).toHaveBeenCalledTimes(1);
+      expect(attachmentRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "a1", name: "ok.txt" }),
+      );
+    });
   });
 
   describe("attachment processing", () => {
