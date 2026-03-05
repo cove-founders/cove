@@ -87,22 +87,32 @@ describe("summaryRepo", () => {
   });
 
   describe("searchMessages", () => {
-    it("filters by conversationId when provided", async () => {
-      db.select.mockResolvedValueOnce([]);
-      await summaryRepo.searchMessages("query", "conv-1");
-
+    it("uses FTS when it returns results", async () => {
+      const row = { conversation_id: "c1", message_id: "m1", body: "hello" };
+      db.select.mockResolvedValueOnce([row]);
+      const result = await summaryRepo.searchMessages("query", "conv-1");
+      expect(result).toEqual([row]);
       const sql = db.select.mock.calls[0][0] as string;
-      expect(sql).toContain("conversation_id = $2");
-      expect(db.select.mock.calls[0][1]).toEqual(["query", "conv-1", 20]);
+      expect(sql).toContain("MATCH");
+    });
+
+    it("falls back to LIKE when FTS returns empty", async () => {
+      db.select.mockResolvedValueOnce([]); // FTS empty
+      db.select.mockResolvedValueOnce([]); // LIKE fallback
+      await summaryRepo.searchMessages("query", "conv-1");
+      expect(db.select).toHaveBeenCalledTimes(2);
+      const likeSql = db.select.mock.calls[1][0] as string;
+      expect(likeSql).toContain("LIKE");
     });
 
     it("searches all conversations when no conversationId", async () => {
-      db.select.mockResolvedValueOnce([]);
+      db.select.mockResolvedValueOnce([]); // FTS empty
+      db.select.mockResolvedValueOnce([]); // LIKE fallback
       await summaryRepo.searchMessages("query");
-
-      const sql = db.select.mock.calls[0][0] as string;
-      expect(sql).not.toContain("conversation_id = $2");
-      expect(db.select.mock.calls[0][1]).toEqual(["query", 20]);
+      const likeSql = db.select.mock.calls[1][0] as string;
+      expect(likeSql).toContain("LIKE");
+      // No conversation_id filter in WHERE clause
+      expect(likeSql).not.toContain("m.conversation_id =");
     });
   });
 
@@ -142,10 +152,27 @@ describe("summaryRepo", () => {
       expect(db.select.mock.calls[0][1]).toEqual(["test", 3]);
     });
 
-    it("returns empty for blank query without db call", async () => {
+    it("returns recent summaries for blank query", async () => {
+      const row = { conversation_id: "c1", summary: "s", keywords: null, rank: 0, created_at: "" };
+      db.select.mockResolvedValueOnce([row]);
       const result = await summaryRepo.searchSummaries("   ");
-      expect(result).toEqual([]);
-      expect(db.select).not.toHaveBeenCalled();
+      expect(result).toEqual([row]);
+      const sql = db.select.mock.calls[0][0] as string;
+      expect(sql).toContain("ORDER BY s.created_at DESC");
+      expect(sql).not.toContain("MATCH");
+    });
+
+    it("falls back to LIKE when FTS returns empty", async () => {
+      // FTS returns empty
+      db.select.mockResolvedValueOnce([]);
+      // LIKE fallback returns a result
+      const likeRow = { conversation_id: "c2", summary: "Chinese text", keywords: null, rank: 0, created_at: "" };
+      db.select.mockResolvedValueOnce([likeRow]);
+      const result = await summaryRepo.searchSummaries("Chinese");
+      expect(result).toEqual([likeRow]);
+      // Second call should be the LIKE fallback
+      const likeSql = db.select.mock.calls[1][0] as string;
+      expect(likeSql).toContain("LIKE");
     });
 
     it("escapes double quotes in query", async () => {

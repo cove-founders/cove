@@ -16,6 +16,69 @@ function normalizeFtsQuery(query: string): string {
   return q.replace(/"/g, '""').split(/\s+/).filter(Boolean).join(" ");
 }
 
+type Db = Awaited<ReturnType<typeof getDb>>;
+
+/** LIKE fallback for summaries — handles CJK and other non-space-delimited text. */
+async function likeFallbackSummaries(
+  db: Db, query: string, limit: number,
+): Promise<SummarySearchResult[]> {
+  const keywords = query.trim().split(/\s+/).filter(Boolean);
+  if (keywords.length === 0) return [];
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  for (const kw of keywords) {
+    const idx = params.length;
+    conditions.push(`(s.summary LIKE $${idx + 1} OR s.keywords LIKE $${idx + 2})`);
+    params.push(`%${kw}%`, `%${kw}%`);
+  }
+  params.push(limit);
+  return db.select<SummarySearchResult[]>(
+    `SELECT s.conversation_id, s.summary, s.keywords, 0.0 as rank,
+            s.created_at
+     FROM conversation_summaries s
+     WHERE ${conditions.join(" OR ")}
+     ORDER BY s.created_at DESC
+     LIMIT $${params.length}`,
+    params,
+  );
+}
+
+/** LIKE fallback for messages — handles CJK text. */
+async function likeFallbackMessages(
+  db: Db, query: string, conversationId: string | undefined, limit: number,
+): Promise<{ conversation_id: string; message_id: string; body: string }[]> {
+  const keywords = query.trim().split(/\s+/).filter(Boolean);
+  if (keywords.length === 0) return [];
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  for (const kw of keywords) {
+    params.push(`%${kw}%`);
+    conditions.push(`m.content LIKE $${params.length}`);
+  }
+  if (conversationId) {
+    params.push(conversationId);
+    const convIdx = params.length;
+    params.push(limit);
+    return db.select(
+      `SELECT m.conversation_id, m.id as message_id, COALESCE(m.content, '') as body
+       FROM messages m
+       WHERE (${conditions.join(" OR ")}) AND m.conversation_id = $${convIdx}
+       ORDER BY m.created_at DESC
+       LIMIT $${params.length}`,
+      params,
+    );
+  }
+  params.push(limit);
+  return db.select(
+    `SELECT m.conversation_id, m.id as message_id, COALESCE(m.content, '') as body
+     FROM messages m
+     WHERE ${conditions.join(" OR ")}
+     ORDER BY m.created_at DESC
+     LIMIT $${params.length}`,
+    params,
+  );
+}
+
 export const summaryRepo = {
   async create(
     id: string,
@@ -56,11 +119,24 @@ export const summaryRepo = {
     query: string,
     limit = 5,
   ): Promise<SummarySearchResult[]> {
-    const ftsQuery = normalizeFtsQuery(query);
-    if (!ftsQuery) return [];
     const db = await getDb();
+    const ftsQuery = normalizeFtsQuery(query);
+
+    // Empty query: return most recent summaries
+    if (!ftsQuery) {
+      return db.select<SummarySearchResult[]>(
+        `SELECT s.conversation_id, s.summary, s.keywords, 0.0 as rank,
+                s.created_at
+         FROM conversation_summaries s
+         ORDER BY s.created_at DESC
+         LIMIT $1`,
+        [limit],
+      );
+    }
+
+    // Try FTS5 first (fast, works for space-delimited languages)
     try {
-      return await db.select(
+      const ftsResults = await db.select<SummarySearchResult[]>(
         `SELECT f.conversation_id, f.summary, f.keywords, f.rank,
                 s.created_at
          FROM conversation_summaries_fts f
@@ -70,9 +146,13 @@ export const summaryRepo = {
          LIMIT $2`,
         [ftsQuery, limit],
       );
+      if (ftsResults.length > 0) return ftsResults;
     } catch {
-      return [];
+      // FTS unavailable — fall through to LIKE
     }
+
+    // Fallback: LIKE search (handles CJK and other non-space-delimited text)
+    return likeFallbackSummaries(db, query, limit);
   },
 
   async searchMessages(
@@ -81,24 +161,33 @@ export const summaryRepo = {
     limit = 20,
   ): Promise<{ conversation_id: string; message_id: string; body: string }[]> {
     const db = await getDb();
-    if (conversationId) {
-      return db.select(
-        `SELECT conversation_id, message_id, body
-         FROM message_fts
-         WHERE message_fts MATCH $1 AND conversation_id = $2
-         ORDER BY rank
-         LIMIT $3`,
-        [query, conversationId, limit],
-      );
+
+    // Try FTS5 first
+    try {
+      const ftsResults = await (conversationId
+        ? db.select<{ conversation_id: string; message_id: string; body: string }[]>(
+            `SELECT conversation_id, message_id, body
+             FROM message_fts
+             WHERE message_fts MATCH $1 AND conversation_id = $2
+             ORDER BY rank
+             LIMIT $3`,
+            [query, conversationId, limit],
+          )
+        : db.select<{ conversation_id: string; message_id: string; body: string }[]>(
+            `SELECT conversation_id, message_id, body
+             FROM message_fts
+             WHERE message_fts MATCH $1
+             ORDER BY rank
+             LIMIT $2`,
+            [query, limit],
+          ));
+      if (ftsResults.length > 0) return ftsResults;
+    } catch {
+      // FTS unavailable — fall through to LIKE
     }
-    return db.select(
-      `SELECT conversation_id, message_id, body
-       FROM message_fts
-       WHERE message_fts MATCH $1
-       ORDER BY rank
-       LIMIT $2`,
-      [query, limit],
-    );
+
+    // Fallback: LIKE search on messages table (handles CJK text)
+    return likeFallbackMessages(db, query, conversationId, limit);
   },
 
   async deleteByConversation(conversationId: string): Promise<void> {
