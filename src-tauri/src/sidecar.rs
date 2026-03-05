@@ -49,15 +49,35 @@ pub fn resolve(name: &str) -> Option<PathBuf> {
     None
 }
 
-/// Build a PATH string with the sidecar directory prepended.
+/// Build a PATH string with sidecar directories prepended.
 ///
 /// Used when spawning subprocesses that need to find bundled tools
 /// (e.g. officellm needs pdftoppm/pdftotext on its PATH).
+///
+/// In production the exe dir contains all sidecar binaries. In dev mode
+/// (`tauri dev`), Tauri does not copy externalBin to `target/debug/`, so
+/// we also include `src-tauri/binaries/` as a fallback.
 pub fn tools_path() -> String {
+    let mut dirs: Vec<String> = Vec::new();
+
+    if let Some(dir) = sidecar_dir() {
+        dirs.push(dir.to_string_lossy().into_owned());
+    }
+
+    // Dev fallback: src-tauri/binaries/ (where pull scripts place binaries)
+    #[cfg(debug_assertions)]
+    {
+        let dev_bin = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries");
+        if dev_bin.is_dir() {
+            dirs.push(dev_bin.to_string_lossy().into_owned());
+        }
+    }
+
     let current = std::env::var("PATH").unwrap_or_default();
-    match sidecar_dir() {
-        Some(dir) => format!("{}:{current}", dir.display()),
-        None => current,
+    if dirs.is_empty() {
+        current
+    } else {
+        format!("{}:{current}", dirs.join(":"))
     }
 }
 
@@ -94,5 +114,17 @@ mod tests {
     #[test]
     fn resolve_returns_none_for_nonexistent() {
         assert!(resolve("nonexistent-binary-12345").is_none());
+    }
+
+    #[test]
+    fn tools_path_includes_dev_binaries_dir() {
+        let path = tools_path();
+        let dev_bin = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries");
+        if dev_bin.is_dir() {
+            assert!(
+                path.contains(&dev_bin.to_string_lossy().to_string()),
+                "tools_path should include src-tauri/binaries/ in debug builds"
+            );
+        }
     }
 }
