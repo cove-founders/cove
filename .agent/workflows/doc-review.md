@@ -1,17 +1,43 @@
 ---
-description: Systematic review of project documentation against codebase reality
+description: Systematic review and maintenance of project documentation against codebase reality
 ---
 
 # Doc Review
 
-Systematic audit of project documentation to catch semantic drift from codebase reality. Complements `skill-maintenance.md` (narrow, trigger-based) with a broad, on-demand review procedure.
+Systematic audit of project documentation to catch semantic drift from codebase reality. Includes both trigger-based sync rules for built-in skills and a broad on-demand review procedure.
 
 ## When to Run
 
 - After completing a feature or refactor that touches multiple files
-- When a PR changes files listed in `skill-maintenance.md` trigger tables
+- When a PR changes files listed in the Skill Sync Triggers below
 - On request ("review docs", "audit documentation")
 - Periodically as a health check
+
+## Skill Sync Triggers
+
+Built-in skills that document application features MUST stay in sync with the codebase. When any of the following files change, update the corresponding skill immediately.
+
+### user-manual
+
+When any of these files change, MUST update `src/skills/user-manual/SKILL.md`:
+
+| File | What to update |
+|------|---------------|
+| `src/lib/ai/tools/tool-meta.ts` | Tools table (added/removed/renamed tools) |
+| `src/components/layout/AppLayout.tsx` | Keyboard shortcuts table |
+| `src/components/settings/SettingsWindow.tsx` | Settings tabs table |
+| `src/lib/ai/provider-meta.ts` | Provider list and count |
+| `src/lib/ai/provider-defs-extra.ts` | Provider list and count |
+| `src/hooks/useMentionDetect.ts` | @mention system description |
+| `src/components/chat/MentionPopover.tsx` | @mention categories |
+
+### feedback
+
+When the following change, MUST check if `src/skills/feedback/SKILL.md` needs updating:
+
+- Repository URL or organization name
+- Feedback email address
+- Issue template structure
 
 ## Scope
 
@@ -81,6 +107,6 @@ For each `src/skills/*/SKILL.md`:
 When reviewing after a specific change rather than doing a full audit:
 
 1. `git diff --name-only HEAD~N` (or vs main) to list changed files.
-2. Cross-reference with `skill-maintenance.md` trigger tables.
+2. Cross-reference with the Skill Sync Triggers above.
 3. For files not in trigger tables, use judgment: does this change affect documented behavior?
 4. Review only affected documents.

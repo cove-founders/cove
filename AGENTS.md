@@ -11,9 +11,8 @@
 5. **`.agent/workflows/test-quality.md`** — 测试质量约束（覆盖率、组件测试、文档覆盖度）
 6. **`.agent/workflows/release-workflow.md`** — 双轨发版规则（Feature / Hotfix 并行）
 7. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
-8. **`.agent/workflows/skill-maintenance.md`** — 内置 Skill 文档同步规则（功能变更时更新 user-manual/feedback）
-9. **`.agent/workflows/doc-review.md`** — 文档审计流程（功能/重构完成后、定期检查，覆盖全部项目文档）
-10. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
+8. **`.agent/workflows/doc-review.md`** — 文档审计与 Skill 同步（含触发规则、全量审计流程）
+9. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
 
 ## 优先级
 
