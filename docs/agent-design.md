@@ -31,12 +31,12 @@ Skill 从三个来源加载：
 | 层级 | 来源 | 加载方式 | 优先级 |
 |------|------|----------|--------|
 | Built-in | `src/skills/*/SKILL.md` | Vite `import.meta.glob` 静态加载 | 2 (最低) |
-| External | IDE 约定目录（claude/cursor 等） | Tauri `discover_external_skills` 扫描 | 1 |
+| External | IDE 约定目录 | Tauri `discover_external_skills` 扫描 | 1 (claude) / 2 (其他) |
 | User | `~/.cove/skills/{name}/SKILL.md` | Tauri `discover_external_skills` 扫描 | 0 (最高) |
 
 External 和 User 两层均通过 `discover_external_skills` 统一扫描发现（`~/.cove/skills` 是默认扫描根之一）。`read_skill` / `write_skill` / `delete_skill` 是单个 Skill 的 CRUD API，不参与发现流程。
 
-同名 Skill 去重时保留优先级最高的来源。`sourcePriority()` 函数实现：cove(0) > claude(1) > 其他(2)。
+同名 Skill 去重时保留优先级最高的来源。`sourcePriority()` 函数实现：cove(0) > claude(1) > 其他含 built-in(2)。注意 cursor、agents、opencode 等非 claude 来源与 built-in 同为优先级 2。
 
 这种设计允许用户覆盖内置 Skill 的行为，同时复用 IDE 生态中已有的 Skill 资源。
 
