@@ -47,6 +47,24 @@ export const writeTool = tool({
 
     if (isOfficeWritable(filePath)) {
       try {
+        const st = await invoke<{ mtime_secs: number }>("stat_file", {
+          args: { workspaceRoot, path: filePath },
+        });
+        const assert = assertReadBeforeWrite(conversationId ?? "", resolvedPath, st.mtime_secs);
+        if (!assert.ok) {
+          return assert.message ?? "无法写入：未通过读后写校验。";
+        }
+      } catch (err) {
+        if (isFsError(err) && err.kind === "NotFound") {
+          // new file, no assert needed
+        } else if (isFsError(err)) {
+          if (err.kind === "OutsideWorkspace") return "该路径不在当前工作区内。";
+          return err.message ? `错误：${err.message}` : `错误：${err.kind}`;
+        } else {
+          return `写入前检查失败：${err instanceof Error ? err.message : String(err)}`;
+        }
+      }
+      try {
         const absPath = await invoke<string>("write_office_text", {
           args: { workspaceRoot, path: filePath, content },
         });

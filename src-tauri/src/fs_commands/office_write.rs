@@ -67,7 +67,15 @@ fn write_docx_via_officellm(
         }
     }
 
-    let tmp_md = std::env::temp_dir().join(format!("cove_write_{}.md", std::process::id()));
+    let unique_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp_md = std::env::temp_dir().join(format!(
+        "cove_write_{}_{:x}.md",
+        std::process::id(),
+        unique_id
+    ));
     fs::write(&tmp_md, content).map_err(FsError::from)?;
 
     let tmp_md_str = tmp_md.to_string_lossy().to_string();

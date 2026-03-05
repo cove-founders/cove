@@ -201,8 +201,12 @@ describe("writeTool", () => {
 
   // --- office file routing ---
 
-  it("routes .docx to write_office_text", async () => {
-    mockInvoke.mockResolvedValue("/workspace/report.docx");
+  it("routes new .docx to write_office_text (no existing file)", async () => {
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "stat_file") throw { kind: "NotFound" };
+      if (cmd === "write_office_text") return "/workspace/report.docx";
+      return undefined;
+    });
 
     const result = await exec({ filePath: "report.docx", content: "Hello" });
 
@@ -213,17 +217,26 @@ describe("writeTool", () => {
     expect(mockRecordRead).toHaveBeenCalledWith("conv-123", "/workspace/report.docx");
   });
 
-  it("skips read-before-write for .docx", async () => {
-    mockInvoke.mockResolvedValue("/workspace/new.docx");
+  it("enforces read-before-write for existing .docx", async () => {
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "stat_file") return { mtime_secs: 2000 };
+      return undefined;
+    });
+    mockAssert.mockReturnValue({ ok: false, message: "请先读取该文件" });
 
-    await exec({ filePath: "new.docx", content: "content" });
+    const result = await exec({ filePath: "existing.docx", content: "x" });
 
-    expect(mockAssert).not.toHaveBeenCalled();
-    expect(mockInvoke).not.toHaveBeenCalledWith("stat_file", expect.anything());
+    expect(mockAssert).toHaveBeenCalledWith("conv-123", "/workspace/existing.docx", 2000);
+    expect(result).toBe("请先读取该文件");
+    expect(mockInvoke).not.toHaveBeenCalledWith("write_office_text", expect.anything());
   });
 
   it("handles write_office_text error", async () => {
-    mockInvoke.mockRejectedValue({ kind: "NotAllowed", message: "officellm not installed" });
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "stat_file") throw { kind: "NotFound" };
+      if (cmd === "write_office_text") throw { kind: "NotAllowed", message: "officellm not installed" };
+      return undefined;
+    });
 
     const result = await exec({ filePath: "out.docx", content: "x" });
 
