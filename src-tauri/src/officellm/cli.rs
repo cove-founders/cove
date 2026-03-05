@@ -14,7 +14,7 @@ const DEFAULT_TIMEOUT_SECS: u64 = 120;
 /// `home` 应由调用方根据 bundled/external 模式通过 `resolve::resolve_home()` 计算。
 /// 等价于：`officellm <cmd> --result-schema v2 --strict [--key value ...]`
 /// 解析 stdout JSON 并返回 `CommandResult`。
-pub fn call(cmd: &str, args: &[String], home: &Path) -> Result<CommandResult, String> {
+pub fn call(cmd: &str, args: &[String], home: &Path, workdir: &Path) -> Result<CommandResult, String> {
     let bin = super::detect::bin_path()?;
 
     let mut command = Command::new(&bin);
@@ -26,6 +26,7 @@ pub fn call(cmd: &str, args: &[String], home: &Path) -> Result<CommandResult, St
     }
 
     super::env::apply_env(&mut command, home);
+    command.current_dir(workdir);
 
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
@@ -101,7 +102,7 @@ mod tests {
     #[test]
     fn call_errors_when_binary_not_found() {
         with_home(|home| {
-            let err = call("test", &[], home).unwrap_err();
+            let err = call("test", &[], home, home).unwrap_err();
             assert!(
                 err.contains("未找到 officellm"),
                 "expected '未找到 officellm' in error, got: {err}"

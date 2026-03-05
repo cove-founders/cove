@@ -269,7 +269,74 @@ describe("officeTool – call", () => {
     });
 
     await exec({ action: "call", command: "extract-text", args: { i: "doc.docx" } });
-    expect(capturedArgs).toEqual(["-i", "doc.docx"]);
+    // `i` is a known path arg key, so relative path gets resolved to workspace root
+    expect(capturedArgs).toEqual(["-i", "/workspace/doc.docx"]);
+  });
+
+  it("resolves relative path args to workspace root", async () => {
+    let capturedArgs: unknown;
+    setupTauriMocks({
+      officellm_call: (payload) => {
+        capturedArgs = (payload as { args?: unknown })?.args;
+        return { status: "success", data: "ok", error: null, metrics: null };
+      },
+    });
+
+    await exec({ action: "call", command: "convert", args: { input: "report.docx", output: "out.pdf" } });
+    expect(capturedArgs).toEqual(["--input", "/workspace/report.docx", "--output", "/workspace/out.pdf"]);
+  });
+
+  it("does not resolve absolute path args", async () => {
+    let capturedArgs: unknown;
+    setupTauriMocks({
+      officellm_call: (payload) => {
+        capturedArgs = (payload as { args?: unknown })?.args;
+        return { status: "success", data: "ok", error: null, metrics: null };
+      },
+    });
+
+    await exec({ action: "call", command: "convert", args: { input: "/abs/report.docx" } });
+    expect(capturedArgs).toEqual(["--input", "/abs/report.docx"]);
+  });
+
+  it("does not resolve non-path arg keys", async () => {
+    let capturedArgs: unknown;
+    setupTauriMocks({
+      officellm_call: (payload) => {
+        capturedArgs = (payload as { args?: unknown })?.args;
+        return { status: "success", data: "ok", error: null, metrics: null };
+      },
+    });
+
+    await exec({ action: "call", command: "addSlide", args: { title: "New Slide" } });
+    expect(capturedArgs).toEqual(["--title", "New Slide"]);
+  });
+
+  it("passes workdir to invoke", async () => {
+    let capturedWorkdir: unknown;
+    setupTauriMocks({
+      officellm_call: (payload) => {
+        capturedWorkdir = (payload as { workdir?: unknown })?.workdir;
+        return { status: "success", data: "ok", error: null, metrics: null };
+      },
+    });
+
+    await exec({ action: "call", command: "test", args: [] });
+    expect(capturedWorkdir).toBe("/workspace");
+  });
+
+  it("passes '/' as workdir when no workspace", async () => {
+    withNoWorkspace();
+    let capturedWorkdir: unknown;
+    setupTauriMocks({
+      officellm_call: (payload) => {
+        capturedWorkdir = (payload as { workdir?: unknown })?.workdir;
+        return { status: "success", data: "ok", error: null, metrics: null };
+      },
+    });
+
+    await exec({ action: "call", command: "test", args: [] });
+    expect(capturedWorkdir).toBe("/");
   });
 });
 
@@ -307,6 +374,33 @@ describe("officeTool – save", () => {
     const result = await exec({ action: "save", path: "/output/fail.docx" });
     expect(result).toContain("Error");
     expect(result).toContain("disk full");
+  });
+
+  it("resolves relative save-as path to workspace root", async () => {
+    let capturedPath: unknown;
+    setupTauriMocks({
+      officellm_save: (payload) => {
+        capturedPath = (payload as { path?: unknown })?.path;
+        return { status: "success", data: null, error: null, metrics: null };
+      },
+    });
+
+    const result = await exec({ action: "save", path: "output/result.docx" });
+    expect(capturedPath).toBe("/workspace/output/result.docx");
+    expect(result).toContain("/workspace/output/result.docx");
+  });
+
+  it("does not resolve absolute save-as path", async () => {
+    let capturedPath: unknown;
+    setupTauriMocks({
+      officellm_save: (payload) => {
+        capturedPath = (payload as { path?: unknown })?.path;
+        return { status: "success", data: null, error: null, metrics: null };
+      },
+    });
+
+    await exec({ action: "save", path: "/abs/result.docx" });
+    expect(capturedPath).toBe("/abs/result.docx");
   });
 });
 
