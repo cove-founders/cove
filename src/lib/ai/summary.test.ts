@@ -35,8 +35,8 @@ describe("maybeGenerateSummary", () => {
     vi.mocked(summaryRepo.getByConversation).mockResolvedValue(undefined);
   });
 
-  it("skips when fewer than 4 substantive messages", async () => {
-    const messages = [makeMsg("user", "hi"), makeMsg("assistant", "hello")];
+  it("skips when fewer than 2 substantive messages", async () => {
+    const messages = [makeMsg("user", "hi")];
     await maybeGenerateSummary("conv-1", messages, generateFn);
     expect(generateFn).not.toHaveBeenCalled();
   });
@@ -48,7 +48,8 @@ describe("maybeGenerateSummary", () => {
       summary: "existing",
       created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     });
-    await maybeGenerateSummary("conv-1", makeMessages(6), generateFn);
+    // 3 messages < STALE_GROWTH_FACTOR * MIN_MESSAGES (2*2=4), so not stale
+    await maybeGenerateSummary("conv-1", makeMessages(3), generateFn);
     expect(generateFn).not.toHaveBeenCalled();
   });
 

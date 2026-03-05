@@ -343,6 +343,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       };
       await messageRepo.create(assistantMsg);
       set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }], ...STREAM_RESET }));
+      runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });
@@ -413,6 +414,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       };
       await messageRepo.create(assistantMsg);
       set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }], ...STREAM_RESET }));
+      runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });
