@@ -390,3 +390,4 @@ INTJ engineer voice. 直接、精确、无废话。
 | `docs/soul-system.md` | Soul 人格系统设计文档 |
 | `docs/soul-implementation.md` | Soul 系统实现细节 |
 | `docs/soul-conversation-log.md` | Soul 对话日志设计 |
+| `docs/agent-design.md` | Agent 设计理念：工具门控、Skill 生命周期、安全模型 |
