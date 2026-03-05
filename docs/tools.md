@@ -194,8 +194,8 @@ Cove 的 AI 工具分为 built-in（始终可用）和 skill-bundled（需 Skill
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `skill_name` | `string` | 技能名称 |
-| `resource_name` | `string` | 资源文件名 |
+| `skillName` | `string` | 技能名称 |
+| `resourcePath` | `string` | 资源完整路径，如 `resources/TABLE_OPERATIONS_GUIDE.md` |
 
 **使用场景**
 
