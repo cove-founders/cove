@@ -3,15 +3,25 @@ import { useTranslation } from "react-i18next";
 import { Code, Eye } from "lucide-react";
 import { MarkdownContent } from "@/components/chat/MarkdownContent";
 import { CodeViewer } from "@/components/preview/CodeViewer";
+import { CsvViewer } from "@/components/preview/CsvViewer";
+import { HtmlViewer } from "@/components/preview/HtmlViewer";
+import { ImageViewer } from "@/components/preview/ImageViewer";
+import { PdfViewer } from "@/components/preview/PdfViewer";
 import { DocxViewer } from "@/components/preview/DocxViewer";
 import { XlsxViewer } from "@/components/preview/XlsxViewer";
 import { PptxViewer } from "@/components/preview/PptxViewer";
+import { UnsupportedFallback } from "@/components/preview/UnsupportedFallback";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFilePreviewStore } from "@/stores/filePreviewStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { getPreviewKind } from "@/lib/preview-types";
 import { cn } from "@/lib/utils";
-import { PreviewFileHeader, OpenExternallyButton, useDetectOfficeApps } from "./PreviewFileHeader";
+import {
+  PreviewFileHeader,
+  OpenExternallyButton,
+  useDetectOfficeApps,
+  useOpenExternally,
+} from "./PreviewFileHeader";
 import { usePreviewContent } from "@/hooks/usePreviewContent";
 
 export function FilePreviewPanel() {
@@ -22,6 +32,7 @@ export function FilePreviewPanel() {
   const { cached, loading, error } = usePreviewContent(selectedPath, workspaceRoot);
   const [mdViewMode, setMdViewMode] = useState<"preview" | "code">("preview");
   const officeApps = useDetectOfficeApps();
+  const openExternally = useOpenExternally(workspaceRoot, selectedPath);
   const headerProps = { workspaceRoot, officeApps };
 
   if (!selectedPath) {
@@ -62,14 +73,15 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
-          {t("preview.unsupported")}
-        </div>
+        <UnsupportedFallback
+          path={selectedPath}
+          workspaceRoot={workspaceRoot}
+          onOpenExternal={() => openExternally()}
+        />
       </div>
     );
   }
 
-  // 有缓存且类型匹配
   if (kind === "txt" && cached?.type === "text" && cached.text !== undefined) {
     const lines = cached.text.split("\n");
     return (
@@ -91,6 +103,26 @@ export function FilePreviewPanel() {
             </pre>
           </div>
         </ScrollArea>
+      </div>
+    );
+  }
+
+  if (kind === "csv" && cached?.type === "text" && cached.text !== undefined) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <ScrollArea className="min-h-0 flex-1 p-1.5">
+          <CsvViewer text={cached.text} />
+        </ScrollArea>
+      </div>
+    );
+  }
+
+  if (kind === "html" && cached?.type === "text" && cached.text !== undefined) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <HtmlViewer code={cached.text} path={selectedPath} />
       </div>
     );
   }
@@ -160,37 +192,20 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
-          <div className="flex min-w-0 w-full justify-center">
-            <img
-              src={cached.dataUrl}
-              alt={selectedPath}
-              className="max-h-full w-full max-w-full object-contain"
-            />
-          </div>
-        </ScrollArea>
+        <ImageViewer src={cached.dataUrl} alt={selectedPath} />
       </div>
     );
   }
 
-  // PDF
   if (kind === "pdf" && cached?.type === "dataUrl" && cached.dataUrl) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="flex-1 p-1.5">
-          <embed
-            src={cached.dataUrl}
-            type="application/pdf"
-            className="h-[80vh] w-full"
-            title="PDF"
-          />
-        </ScrollArea>
+        <PdfViewer dataUrl={cached.dataUrl} />
       </div>
     );
   }
 
-  // XLSX / PPTX / DOCX 等 Office
   if (kind === "office" && cached?.type === "dataUrl" && cached.dataUrl) {
     const officeExt = selectedPath.replace(/^.*\./, "").toLowerCase();
 
