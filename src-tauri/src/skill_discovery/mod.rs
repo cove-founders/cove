@@ -103,7 +103,8 @@ fn walk_resources(dir: &Path, base: &Path, depth: usize, out: &mut Vec<String>) 
             let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
             if RESOURCE_EXTENSIONS.contains(&ext) {
                 if let Ok(rel) = path.strip_prefix(base) {
-                    out.push(rel.to_string_lossy().into_owned());
+                    // Normalize to forward slashes so TS lookup works on all platforms
+                    out.push(rel.to_string_lossy().replace('\\', "/"));
                 }
             }
         }
