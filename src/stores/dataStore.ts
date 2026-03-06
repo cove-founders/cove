@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Assistant, Conversation, Message, Provider, Prompt } from "@/db/types";
+import type { Assistant, Conversation, Provider, Prompt } from "@/db/types";
 import { assistantRepo } from "@/db/repos/assistantRepo";
 import { conversationRepo } from "@/db/repos/conversationRepo";
 import { messageRepo } from "@/db/repos/messageRepo";
@@ -14,7 +14,6 @@ interface DataState {
   conversations: Conversation[];
   providers: Provider[];
   prompts: Prompt[];
-  messages: Message[];
   activeConversationId: string | null;
 
   // Loading state
@@ -27,7 +26,6 @@ interface DataState {
   loadConversations: () => Promise<void>;
   loadProviders: () => Promise<void>;
   loadPrompts: () => Promise<void>;
-  loadMessages: (conversationId: string) => Promise<void>;
   setActiveConversation: (id: string | null) => void;
 
   // Conversation
@@ -47,7 +45,6 @@ export const useDataStore = create<DataState>()((set, get) => ({
   conversations: [],
   providers: [],
   prompts: [],
-  messages: [],
   activeConversationId: null,
   initialized: false,
   initError: null,
@@ -90,20 +87,12 @@ export const useDataStore = create<DataState>()((set, get) => ({
     set({ prompts });
   },
 
-  async loadMessages(conversationId: string) {
-    const messages = await messageRepo.getByConversation(conversationId);
-    set({ messages });
-  },
-
   setActiveConversation(id: string | null) {
     if (typeof localStorage !== "undefined") {
       if (id) localStorage.setItem("office_chat_active_conversation_id", id);
       else localStorage.removeItem("office_chat_active_conversation_id");
     }
-    set({ activeConversationId: id, messages: [] });
-    if (id) {
-      get().loadMessages(id);
-    }
+    set({ activeConversationId: id });
   },
 
   async updateConversation(id, data) {
@@ -122,7 +111,7 @@ export const useDataStore = create<DataState>()((set, get) => ({
     await conversationRepo.delete(id);
     if (get().activeConversationId === id) {
       if (typeof localStorage !== "undefined") localStorage.removeItem("office_chat_active_conversation_id");
-      set({ activeConversationId: null, messages: [] });
+      set({ activeConversationId: null });
     }
     await get().loadConversations();
   },
