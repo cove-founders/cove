@@ -59,6 +59,28 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn runs_init_even_when_config_exists() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let home = dir.path();
+        // Pre-create config.json to simulate a previous init.
+        std::fs::write(home.join("config.json"), "{}").unwrap();
+
+        // Binary that creates a marker file proving it was invoked.
+        let bin = dir.path().join("tracking-officellm");
+        std::fs::write(
+            &bin,
+            "#!/bin/sh\ntouch \"$OFFICELLM_HOME/init-was-called\"\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&bin, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
+
+        assert!(ensure_initialized(&bin, home).is_ok());
+        assert!(home.join("init-was-called").exists(), "init must run even when config.json exists");
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn fails_on_nonzero_exit() {
         let dir = tempfile::TempDir::new().unwrap();
         let home = dir.path();
