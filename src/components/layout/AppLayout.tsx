@@ -1,109 +1,118 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { useLayoutStore } from "@/stores/layoutStore";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useLayoutStore, SIDEBAR_MIN, SIDEBAR_MAX } from "@/stores/layoutStore";
 import { useDataStore } from "@/stores/dataStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useFilePreviewStore } from "@/stores/filePreviewStore";
-import { LeftSidebar } from "@/components/sidebar/LeftSidebar";
+import { useNavigationStore } from "@/stores/navigationStore";
+import { MainNavSidebar } from "@/components/sidebar/MainNavSidebar";
+import { MiniNavSidebar } from "@/components/sidebar/MiniNavSidebar";
 import { SearchMessagesDialog } from "@/components/sidebar/SearchMessagesDialog";
-import { ChatArea } from "@/components/chat/ChatArea";
-import { FilePanelHeader } from "@/components/preview/FilePanelHeader";
-import { FileTreePanel } from "@/components/preview/FileTreePanel";
-import { FilePreviewPanel } from "@/components/preview/FilePreviewPanel";
+import { ConversationContent } from "./ConversationContent";
+import { WorkspaceContent } from "./WorkspaceContent";
 import { ResizeHandle } from "./ResizeHandle";
-import { WindowControls } from "./WindowControls";
 import { openSettingsWindow } from "@/lib/settings-window";
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
+import { PanelLeft, PanelRight } from "lucide-react";
 
-const SIDEBAR_MIN = 200;
-const SIDEBAR_MAX = 400;
-const CHAT_MIN = 480;
-const CHAT_MAX = 1200;
-const FILE_TREE_MIN = 200;
-const FILE_TREE_MAX = 480;
-const FILE_PREVIEW_MIN = 200;
+const ExtensionMarketPage = lazy(
+  () => import("@/components/extensions/ExtensionMarketPage"),
+);
 
 export function AppLayout() {
-  const leftOpen = useLayoutStore((s) => s.leftSidebarOpen);
+  const activePage = useLayoutStore((s) => s.activePage);
+  const leftSidebarMode = useLayoutStore((s) => s.leftSidebarMode);
   const toggleLeft = useLayoutStore((s) => s.toggleLeftSidebar);
-  const setActiveConversation = useDataStore((s) => s.setActiveConversation);
+  const setLeftSidebarFull = useLayoutStore((s) => s.setLeftSidebarFull);
   const leftSidebarWidth = useLayoutStore((s) => s.leftSidebarWidth);
   const setLeftSidebarWidth = useLayoutStore((s) => s.setLeftSidebarWidth);
-  const chatWidth = useLayoutStore((s) => s.chatWidth);
-  const setChatWidth = useLayoutStore((s) => s.setChatWidth);
-  const filePanelOpen = useLayoutStore((s) => s.filePanelOpen);
-  const filePanelClosing = useLayoutStore((s) => s.filePanelClosing) ?? false;
-  const filePanelOpening = useLayoutStore((s) => s.filePanelOpening) ?? false;
-  const setFilePanelOpen = useLayoutStore((s) => s.setFilePanelOpen);
-  const confirmFilePanelClosed = useLayoutStore((s) => s.confirmFilePanelClosed);
-  const confirmFilePanelOpened = useLayoutStore((s) => s.confirmFilePanelOpened);
-  const fileTreeWidth = useLayoutStore((s) => s.fileTreeWidth);
-  const setFileTreeWidth = useLayoutStore((s) => s.setFileTreeWidth);
+  const setActivePage = useLayoutStore((s) => s.setActivePage);
 
-  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
-  const [searchMessagesOpen, setSearchMessagesOpen] = useState(false);
-  const middleSectionRef = useRef<HTMLDivElement>(null);
-  const [chatColumnCloseTarget, setChatColumnCloseTarget] = useState<number | null>(null);
-  const [chatColumnOpenTarget, setChatColumnOpenTarget] = useState<number | null>(null);
-  const closeConfirmedRef = useRef(false);
-
-  // 关闭：测量总宽，rAF 后设目标，边框向右滑
-  useLayoutEffect(() => {
-    if (!filePanelClosing) {
-      setChatColumnCloseTarget(null);
-      closeConfirmedRef.current = false;
-      return;
-    }
-    const w = middleSectionRef.current?.offsetWidth;
-    if (w == null || w <= 0) return;
-    const id = requestAnimationFrame(() => setChatColumnCloseTarget(w));
-    return () => cancelAnimationFrame(id);
-  }, [filePanelClosing]);
-
-  // 展开：先 100% 占满，rAF 后缩回 chatWidth，边框从左滑到右
-  useLayoutEffect(() => {
-    if (!filePanelOpening) {
-      setChatColumnOpenTarget(null);
-      return;
-    }
-    setChatColumnOpenTarget(null);
-    const id = requestAnimationFrame(() => setChatColumnOpenTarget(chatWidth));
-    return () => cancelAnimationFrame(id);
-  }, [filePanelOpening, chatWidth]);
-
-  const handleNewChat = useCallback(() => {
-    setActiveConversation(null);
-    useChatStore.getState().reset();
-  }, [setActiveConversation]);
-
+  const setActiveConversation = useDataStore((s) => s.setActiveConversation);
+  const activeConversationId = useDataStore((s) => s.activeConversationId);
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const setWorkspaceRoot = useFilePreviewStore((s) => s.setWorkspaceRoot);
 
+  const [searchMessagesOpen, setSearchMessagesOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  /* Detect macOS fullscreen to collapse traffic-light spacer */
+  useEffect(() => {
+    const win = getCurrentWindow();
+    win.isFullscreen().then(setIsFullscreen).catch(() => {});
+    let unlisten: (() => void) | undefined;
+    win.listen("tauri://resize", async () => {
+      try { setIsFullscreen(await win.isFullscreen()); } catch { /* ignore */ }
+    }).then((u) => { unlisten = u; }).catch(() => {});
+    return () => unlisten?.();
+  }, []);
+
+  /* ── Navigation history ── */
+  const navInitialized = useRef(false);
+  useEffect(() => {
+    // Push to nav history whenever page or conversation changes
+    // Skip the very first render to avoid double-pushing the initial state
+    if (!navInitialized.current) {
+      navInitialized.current = true;
+      useNavigationStore.getState().push({ page: activePage, conversationId: activeConversationId });
+      return;
+    }
+    useNavigationStore.getState().push({ page: activePage, conversationId: activeConversationId });
+  }, [activePage, activeConversationId]);
+
+  const handleGoBack = useCallback(() => {
+    const entry = useNavigationStore.getState().goBack();
+    if (entry) {
+      setActivePage(entry.page);
+      setActiveConversation(entry.conversationId);
+      if (entry.conversationId) {
+        useChatStore.getState().loadMessages(entry.conversationId);
+      } else {
+        useChatStore.getState().reset();
+      }
+    }
+  }, [setActivePage, setActiveConversation]);
+
+  const handleGoForward = useCallback(() => {
+    const entry = useNavigationStore.getState().goForward();
+    if (entry) {
+      setActivePage(entry.page);
+      setActiveConversation(entry.conversationId);
+      if (entry.conversationId) {
+        useChatStore.getState().loadMessages(entry.conversationId);
+      } else {
+        useChatStore.getState().reset();
+      }
+    }
+  }, [setActivePage, setActiveConversation]);
+
+  /* ── Context-aware new chat ── */
+  const handleNewChat = useCallback(() => {
+    setActiveConversation(null);
+    useChatStore.getState().reset();
+
+    const ws = useWorkspaceStore.getState().activeWorkspace;
+    if (activePage === "workspace" && ws && !ws.is_default) {
+      useWorkspaceStore.getState().select(ws.id, null);
+    } else {
+      setActivePage("chat");
+    }
+  }, [setActiveConversation, setActivePage, activePage]);
+
+  /* Sync workspace root to filePreviewStore */
   useEffect(() => {
     setWorkspaceRoot(activeWorkspace?.path ?? null);
   }, [activeWorkspace?.path, setWorkspaceRoot]);
 
-  // 工作区变化时启/停文件监听
+  /* Start/stop workspace file watcher */
   useEffect(() => {
     const root = activeWorkspace?.path?.trim() ?? "";
     invoke("watch_workspace_command", { args: { workspaceRoot: root } }).catch(() => {});
   }, [activeWorkspace?.path]);
 
-  // 响应式：窗口过窄时自动收起文件面板
-  useEffect(() => {
-    const WIDTH_THRESHOLD = 1000;
-    const check = () => {
-      if (window.innerWidth < WIDTH_THRESHOLD && useLayoutStore.getState().filePanelOpen) {
-        setFilePanelOpen(false);
-      }
-    };
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, [setFilePanelOpen]);
-
-  // 实时预览：监听 workspace-file-changed，刷新预览或处理删除
+  /* File change events: refresh preview or handle deletion */
   useEffect(() => {
     const unlistenPromise = listen<{ path: string; kind: string }>(
       "workspace-file-changed",
@@ -122,165 +131,128 @@ export function AppLayout() {
         }
       },
     );
-    return () => {
-      unlistenPromise.then((u) => u());
-    };
+    return () => { unlistenPromise.then((u) => u()); };
   }, []);
 
-  // 监听菜单栏「Settings」点击（macOS 顶部菜单 Cove -> Settings）
+  /* macOS menu bar Settings */
   useEffect(() => {
-    const unlistenPromise = listen("open-settings", () => {
-      openSettingsWindow();
-    });
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
+    const unlistenPromise = listen("open-settings", () => openSettingsWindow());
+    return () => { unlistenPromise.then((u) => u()); };
   }, []);
 
-  const chatColumnTargetWidth: number | string = filePanelClosing && chatColumnCloseTarget != null
-    ? chatColumnCloseTarget
-    : filePanelOpening
-      ? (chatColumnOpenTarget ?? "100%")
-      : chatWidth;
-  const handleChatColumnTransitionEnd = useCallback(
-    (e: React.TransitionEvent) => {
-      if (e.propertyName !== "width") return;
-      if (filePanelClosing && !closeConfirmedRef.current) {
-        closeConfirmedRef.current = true;
-        confirmFilePanelClosed();
-      }
-      if (filePanelOpening) {
-        confirmFilePanelOpened();
-      }
-    },
-    [filePanelClosing, filePanelOpening, confirmFilePanelClosed, confirmFilePanelOpened],
-  );
-
+  /* Global keyboard shortcuts */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
-
       if (meta && !e.shiftKey && e.key === "b") {
         e.preventDefault();
         toggleLeft();
       }
-
-      // ⌘N new chat
       if (meta && e.key === "n") {
         e.preventDefault();
         handleNewChat();
       }
-
-      // ⌘⇧F full-text search messages
       if (meta && e.shiftKey && e.key === "F") {
         e.preventDefault();
         setSearchMessagesOpen(true);
       }
-
-      // ⌘/ to open model selector
-      if (meta && e.key === "/") {
-        e.preventDefault();
-        setModelSelectorOpen(true);
-      }
-
-      // ⌘, to open settings
       if (meta && e.key === ",") {
         e.preventDefault();
         openSettingsWindow();
       }
+      if (meta && e.shiftKey && e.key === "W") {
+        e.preventDefault();
+        setActivePage(activePage === "workspace" ? "chat" : "workspace");
+      }
+      if (meta && e.shiftKey && e.key === "E") {
+        e.preventDefault();
+        setActivePage(activePage === "extensions" ? "chat" : "extensions");
+      }
+      // Navigation history: Cmd+[ / Cmd+]
+      if (meta && !e.shiftKey && e.key === "[") {
+        e.preventDefault();
+        handleGoBack();
+      }
+      if (meta && !e.shiftKey && e.key === "]") {
+        e.preventDefault();
+        handleGoForward();
+      }
     };
-
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleLeft, handleNewChat]);
+  }, [toggleLeft, handleNewChat, handleGoBack, handleGoForward, activePage, setActivePage]);
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-background">
-      <WindowControls onToggleSidebar={toggleLeft} onNewChat={handleNewChat} />
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
+      {/* ═══════════════════════════════════════════════════════════════
+          Global Title Bar (40px)
+          [traffic-light spacer?] [sidebar toggle] [← back] [→ forward]
+          Remaining area is a drag region for window movement.
+          ═══════════════════════════════════════════════════════════════ */}
+      <div
+        data-tauri-drag-region
+        className="flex h-10 w-full shrink-0 items-center border-b border-border"
+      >
+        {/* Traffic-light safe zone — hidden in fullscreen */}
+        {!isFullscreen && <div className="w-[76px] shrink-0" />}
 
-      {leftOpen ? (
-        <div
-          className="relative flex shrink-0 flex-col overflow-hidden border-r border-sidebar-border"
-          style={{ width: leftSidebarWidth, minWidth: SIDEBAR_MIN }}
-        >
-          <LeftSidebar open />
-          <ResizeHandle
-            side="left"
-            currentWidth={leftSidebarWidth}
-            onResize={setLeftSidebarWidth}
-            minWidth={SIDEBAR_MIN}
-            maxWidth={SIDEBAR_MAX}
-          />
+        {/* Sidebar toggle */}
+        <div className="flex items-center px-1.5">
+          <button
+            onClick={leftSidebarMode === "full" ? toggleLeft : setLeftSidebarFull}
+            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            title={leftSidebarMode === "full" ? "收起侧边栏 (⌘B)" : "展开侧边栏 (⌘B)"}
+          >
+            {leftSidebarMode === "full"
+              ? <PanelLeft className="size-[18px]" strokeWidth={1.5} />
+              : <PanelRight className="size-[18px]" strokeWidth={1.5} />
+            }
+          </button>
         </div>
-      ) : (
-        <LeftSidebar open={false} />
-      )}
+      </div>
 
-      <div ref={middleSectionRef} className="flex min-w-0 flex-1">
-        {filePanelOpen || filePanelClosing ? (
-          <>
-            <div
-              className="relative flex min-w-0 shrink-0 flex-col overflow-hidden border-r border-border transition-[width] duration-300 ease-out"
-              style={{
-                width: chatColumnTargetWidth,
-                minWidth: CHAT_MIN,
-                willChange: filePanelClosing || filePanelOpening ? "width" : undefined,
-              }}
-              onTransitionEnd={handleChatColumnTransitionEnd}
-            >
-              <ChatArea
-                leftSidebarOpen={leftOpen}
-                modelSelectorOpen={modelSelectorOpen}
-                onModelSelectorOpenChange={setModelSelectorOpen}
-              />
-              <ResizeHandle
-                side="left"
-                currentWidth={chatWidth}
-                onResize={setChatWidth}
-                minWidth={CHAT_MIN}
-                maxWidth={CHAT_MAX}
-              />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
-              <div
-                className="flex min-h-0 min-w-0 flex-1 flex-col"
-                style={{
-                  opacity: filePanelClosing || filePanelOpening ? 0 : 1,
-                  visibility: filePanelClosing || filePanelOpening ? "hidden" : "visible",
-                }}
-              >
-                <FilePanelHeader />
-                <div className="flex min-h-0 flex-1">
-                  <div
-                    className="relative flex shrink-0 flex-col overflow-hidden"
-                    style={{ width: fileTreeWidth, minWidth: FILE_TREE_MIN }}
-                  >
-                    <FileTreePanel />
-                    <ResizeHandle
-                      side="left"
-                      currentWidth={fileTreeWidth}
-                      onResize={setFileTreeWidth}
-                      minWidth={FILE_TREE_MIN}
-                      maxWidth={FILE_TREE_MAX}
-                    />
-                  </div>
-                  <div
-                    className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-border"
-                    style={{ minWidth: FILE_PREVIEW_MIN }}
-                  >
-                    <FilePreviewPanel />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <ChatArea
-            leftSidebarOpen={leftOpen}
-            modelSelectorOpen={modelSelectorOpen}
-            onModelSelectorOpenChange={setModelSelectorOpen}
-          />
+      {/* ═══════════════════════════════════════════════════════════════
+          Main body — sidebar (left) + content (right)
+          ═══════════════════════════════════════════════════════════════ */}
+      <div className="relative flex min-h-0 flex-1">
+        {/* Full sidebar */}
+        {leftSidebarMode === "full" && (
+          <div
+            className="relative flex shrink-0 flex-col overflow-hidden border-r border-sidebar-border transition-[width,min-width] duration-200 ease-out"
+            style={{ width: leftSidebarWidth, minWidth: SIDEBAR_MIN }}
+          >
+            <MainNavSidebar />
+            <ResizeHandle
+              side="left"
+              currentWidth={leftSidebarWidth}
+              onResize={setLeftSidebarWidth}
+              minWidth={SIDEBAR_MIN}
+              maxWidth={SIDEBAR_MAX}
+            />
+          </div>
         )}
+
+        {/* Mini (52px icon-strip) sidebar */}
+        {leftSidebarMode === "mini" && (
+          <div className="relative flex w-[52px] shrink-0 flex-col overflow-hidden">
+            <MiniNavSidebar />
+          </div>
+        )}
+
+        {/* Main content — switches by activePage */}
+        <div className="flex min-w-0 flex-1">
+          {activePage === "chat" && <ConversationContent />}
+          {activePage === "workspace" && <WorkspaceContent />}
+          {activePage === "extensions" && (
+            <Suspense fallback={
+              <div className="flex flex-1 items-center justify-center text-muted-foreground">
+                Loading...
+              </div>
+            }>
+              <ExtensionMarketPage />
+            </Suspense>
+          )}
+        </div>
       </div>
 
       <SearchMessagesDialog

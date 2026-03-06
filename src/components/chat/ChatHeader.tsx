@@ -1,16 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Sun, Moon, LayoutPanelLeft } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "@/stores/themeStore";
 import { useDataStore } from "@/stores/dataStore";
-import { useLayoutStore } from "@/stores/layoutStore";
 
-interface ChatHeaderProps {
-  leftSidebarOpen: boolean;
-}
-
-export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
+export function ChatHeader() {
   const { t } = useTranslation();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
@@ -26,26 +21,20 @@ export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
     (theme === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
 
-  const filePanelOpen = useLayoutStore((s) => s.filePanelOpen);
-  const toggleFilePanel = useLayoutStore((s) => s.toggleFilePanel);
-
   return (
     <div className="shrink-0">
       <div
-        data-tauri-drag-region
-        className="no-select flex h-[52px] items-center px-3"
+        className="no-select flex h-8 items-center px-3"
       >
-        {/* 当前对话标题 */}
         <div
-          className="ml-3 flex min-w-0 max-w-[50%] items-center transition-[padding] duration-300 ease-out"
-          style={{ paddingLeft: leftSidebarOpen ? 0 : 148 }}
+          className="ml-3 flex min-w-0 max-w-[50%] items-center"
         >
           <span className="truncate text-[13px] font-semibold text-foreground">
             {title}
           </span>
         </div>
 
-        <div className="flex-1 min-w-0" />
+        <div className="min-w-0 flex-1" />
 
         {/* Theme toggle */}
         <Button
@@ -61,18 +50,6 @@ export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
             <Moon className="size-[16px]" strokeWidth={1.5} />
           )}
         </Button>
-
-        {!filePanelOpen && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={toggleFilePanel}
-            className="size-6 text-muted-foreground hover:text-foreground"
-            title={t("preview.openFilePanel")}
-          >
-            <LayoutPanelLeft className="size-[16px]" strokeWidth={1.5} />
-          </Button>
-        )}
       </div>
       <Separator />
     </div>

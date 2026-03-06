@@ -158,6 +158,7 @@ pub fn run() {
       config_commands::read_config,
       config_commands::write_config,
       docx_commands::docx_to_pdf,
+      docx_commands::docx_to_html,
       docx_commands::qmd_to_pdf,
       docx_commands::pptx_to_pdf,
       officellm::officellm_detect,
