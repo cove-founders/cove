@@ -5,13 +5,13 @@ use std::process::Command;
 
 /// Ensure the officellm home directory is initialized and up-to-date.
 ///
-/// Always runs `bin init` with `OFFICELLM_HOME=home` so that bundled
-/// skills stay in sync when the binary is upgraded. The init command
-/// itself is idempotent — it overwrites stale assets and no-ops for
-/// config that already exists.
+/// Always runs `bin init --force` with `OFFICELLM_HOME=home` so that
+/// bundled skills stay in sync when the binary is upgraded. The
+/// `--force` flag overwrites existing files (the CLI skips them by
+/// default), while config.json is preserved.
 pub(crate) fn ensure_initialized(bin: &Path, home: &Path) -> Result<(), String> {
     let output = Command::new(bin)
-        .arg("init")
+        .args(["init", "--force"])
         .env("OFFICELLM_HOME", home)
         .output()
         .map_err(|e| format!("failed to spawn officellm init: {e}"))?;
