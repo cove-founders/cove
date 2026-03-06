@@ -110,13 +110,12 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
           .filter((e) => e.source === "office-bundled")
           .map((e) => e.skill.meta.name);
         if (bundledNames.length > 0) {
-          const enabled = get().enabledSkillNames;
+          // Read from config, not store — store may still be at default []
+          const enabled = await getEnabledSkillNames();
           const missing = bundledNames.filter((n) => !enabled.includes(n));
-          if (missing.length > 0) {
-            const next = [...enabled, ...missing];
-            await setEnabledSkillNames(next);
-            set({ enabledSkillNames: next });
-          }
+          const next = missing.length > 0 ? [...enabled, ...missing] : enabled;
+          if (missing.length > 0) await setEnabledSkillNames(next);
+          set({ enabledSkillNames: next });
         }
       } catch (e) {
         set({ externalSkills: [], loaded: true, scanError: String(e) });

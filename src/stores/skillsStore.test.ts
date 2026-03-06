@@ -266,13 +266,12 @@ describe("skillsStore - saveSkill", () => {
 
 describe("skillsStore - loadExternalSkills auto-enables office-bundled", () => {
   it("auto-enables office-bundled skill names missing from enabledSkillNames", async () => {
-    mockConfig({});
+    mockConfig({ enabled: ["existing-skill"] });
     const bundledSkill = makeSkill("officellm-bundled");
     vi.mocked(parseSkillFromRaw).mockReturnValue(bundledSkill);
     vi.mocked(invoke).mockResolvedValue([
       { source: "office-bundled", name: "OfficeLLM", path: "/bundled/path", content: "bundled" },
     ]);
-    useSkillsStore.setState({ enabledSkillNames: ["existing-skill"] });
 
     await useSkillsStore.getState().loadExternalSkills();
 
@@ -283,13 +282,12 @@ describe("skillsStore - loadExternalSkills auto-enables office-bundled", () => {
   });
 
   it("does not duplicate already-enabled office-bundled skills", async () => {
-    mockConfig({});
+    mockConfig({ enabled: ["already-enabled"] });
     const bundledSkill = makeSkill("already-enabled");
     vi.mocked(parseSkillFromRaw).mockReturnValue(bundledSkill);
     vi.mocked(invoke).mockResolvedValue([
       { source: "office-bundled", name: "OfficeLLM", path: "/bundled/path", content: "bundled" },
     ]);
-    useSkillsStore.setState({ enabledSkillNames: ["already-enabled"] });
 
     await useSkillsStore.getState().loadExternalSkills();
 
