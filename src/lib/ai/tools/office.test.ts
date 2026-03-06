@@ -38,6 +38,20 @@ async function exec(input: ExecInput) {
   return officeTool.execute!(input, {} as ExecOptions);
 }
 
+const OK_RESULT = { status: "success", data: "ok", error: null, metrics: null };
+
+/** Setup mock that captures a specific field from the invoke payload. */
+function captureCallField<T>(field: string): { get: () => T } {
+  let value: T;
+  setupTauriMocks({
+    officellm_call: (payload) => {
+      value = (payload as Record<string, T>)?.[field];
+      return OK_RESULT;
+    },
+  });
+  return { get: () => value };
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -160,6 +174,32 @@ describe("officeTool – open", () => {
     expect(result).toContain("/absolute/path/doc.docx");
   });
 
+  it("treats Windows drive-letter paths as absolute", async () => {
+    let capturedPath: string | undefined;
+    setupTauriMocks({
+      officellm_open: (payload) => {
+        capturedPath = (payload as { path?: string })?.path;
+        return undefined;
+      },
+    });
+
+    await exec({ action: "open", path: "C:\\docs\\report.docx" });
+    expect(capturedPath).toBe("C:\\docs\\report.docx");
+  });
+
+  it("treats UNC paths as absolute", async () => {
+    let capturedPath: string | undefined;
+    setupTauriMocks({
+      officellm_open: (payload) => {
+        capturedPath = (payload as { path?: string })?.path;
+        return undefined;
+      },
+    });
+
+    await exec({ action: "open", path: "\\\\server\\share\\doc.docx" });
+    expect(capturedPath).toBe("\\\\server\\share\\doc.docx");
+  });
+
   it("uses path as-is when workspace is null and path is relative", async () => {
     withNoWorkspace();
     let capturedPath: string | undefined;
@@ -234,42 +274,56 @@ describe("officeTool – call", () => {
   });
 
   it("passes legacy array args to invoke", async () => {
-    let capturedArgs: unknown;
-    setupTauriMocks({
-      officellm_call: (payload) => {
-        capturedArgs = (payload as { args?: unknown })?.args;
-        return { status: "success", data: "ok", error: null, metrics: null };
-      },
-    });
-
+    const cap = captureCallField<unknown>("args");
     await exec({ action: "call", command: "addSlide", args: ["--position", "2"] });
-    expect(capturedArgs).toEqual(["--position", "2"]);
+    expect(cap.get()).toEqual(["--position", "2"]);
   });
 
   it("converts object args to CLI-style array", async () => {
-    let capturedArgs: unknown;
-    setupTauriMocks({
-      officellm_call: (payload) => {
-        capturedArgs = (payload as { args?: unknown })?.args;
-        return { status: "success", data: "ok", error: null, metrics: null };
-      },
-    });
-
+    const cap = captureCallField<unknown>("args");
     await exec({ action: "call", command: "addSlide", args: { title: "New", position: "2" } });
-    expect(capturedArgs).toEqual(["--title", "New", "--position", "2"]);
+    expect(cap.get()).toEqual(["--title", "New", "--position", "2"]);
   });
 
-  it("converts single-char object keys to short flags", async () => {
-    let capturedArgs: unknown;
-    setupTauriMocks({
-      officellm_call: (payload) => {
-        capturedArgs = (payload as { args?: unknown })?.args;
-        return { status: "success", data: "ok", error: null, metrics: null };
-      },
-    });
-
+  it("converts single-char keys to short flags and resolves path args", async () => {
+    const cap = captureCallField<unknown>("args");
     await exec({ action: "call", command: "extract-text", args: { i: "doc.docx" } });
-    expect(capturedArgs).toEqual(["-i", "doc.docx"]);
+    expect(cap.get()).toEqual(["-i", "/workspace/doc.docx"]);
+  });
+
+  it("resolves relative path args to workspace root", async () => {
+    const cap = captureCallField<unknown>("args");
+    await exec({ action: "call", command: "convert", args: { input: "report.docx", output: "out.pdf" } });
+    expect(cap.get()).toEqual(["--input", "/workspace/report.docx", "--output", "/workspace/out.pdf"]);
+  });
+
+  it("does not resolve absolute path args (Unix or Windows)", async () => {
+    const cap = captureCallField<unknown>("args");
+    await exec({ action: "call", command: "convert", args: { input: "/abs/report.docx" } });
+    expect(cap.get()).toEqual(["--input", "/abs/report.docx"]);
+
+    const cap2 = captureCallField<unknown>("args");
+    await exec({ action: "call", command: "convert", args: { input: "D:\\files\\report.docx" } });
+    expect(cap2.get()).toEqual(["--input", "D:\\files\\report.docx"]);
+  });
+
+  it("does not resolve non-path arg keys", async () => {
+    const cap = captureCallField<unknown>("args");
+    await exec({ action: "call", command: "addSlide", args: { title: "New Slide" } });
+    expect(cap.get()).toEqual(["--title", "New Slide"]);
+  });
+
+  it("passes workdir to invoke", async () => {
+    const cap = captureCallField<unknown>("workdir");
+    await exec({ action: "call", command: "test", args: [] });
+    expect(cap.get()).toBe("/workspace");
+  });
+
+  it("passes '/' as workdir when no workspace", async () => {
+    withNoWorkspace();
+    const cap = captureCallField<unknown>("workdir");
+    await exec({ action: "call", command: "test", args: [] });
+    expect(cap.get()).toBe("/");
   });
 });
 
@@ -307,6 +361,34 @@ describe("officeTool – save", () => {
     const result = await exec({ action: "save", path: "/output/fail.docx" });
     expect(result).toContain("Error");
     expect(result).toContain("disk full");
+  });
+
+  it("resolves relative save-as path to workspace root", async () => {
+    let capturedPath: unknown;
+    setupTauriMocks({
+      officellm_save: (payload) => {
+        capturedPath = (payload as { path?: unknown })?.path;
+        return { status: "success", data: null, error: null, metrics: null };
+      },
+    });
+    const result = await exec({ action: "save", path: "output/result.docx" });
+    expect(capturedPath).toBe("/workspace/output/result.docx");
+    expect(result).toContain("/workspace/output/result.docx");
+  });
+
+  it("does not resolve absolute save-as paths (Unix or Windows)", async () => {
+    let capturedPath: unknown;
+    const saveMock = (payload: unknown) => {
+      capturedPath = (payload as { path?: unknown })?.path;
+      return { status: "success" as const, data: null, error: null, metrics: null };
+    };
+    setupTauriMocks({ officellm_save: saveMock });
+    await exec({ action: "save", path: "/abs/result.docx" });
+    expect(capturedPath).toBe("/abs/result.docx");
+
+    setupTauriMocks({ officellm_save: saveMock });
+    await exec({ action: "save", path: "C:\\output\\result.docx" });
+    expect(capturedPath).toBe("C:\\output\\result.docx");
   });
 });
 

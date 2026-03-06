@@ -8,7 +8,7 @@
 import type { Message } from "@/db/types";
 import { summaryRepo } from "@/db/repos/summaryRepo";
 
-const MIN_MESSAGES_FOR_SUMMARY = 4;
+const MIN_MESSAGES_FOR_SUMMARY = 2;
 const STALE_GROWTH_FACTOR = 2;
 const SUMMARY_REFRESH_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
@@ -25,10 +25,14 @@ export async function maybeGenerateSummary(
   const substantive = messages.filter(
     (m) => m.role === "user" || m.role === "assistant",
   );
-  if (substantive.length < MIN_MESSAGES_FOR_SUMMARY) return;
+  if (substantive.length < MIN_MESSAGES_FOR_SUMMARY) {
+    console.info(`[SOUL] skip summary: ${substantive.length} messages < ${MIN_MESSAGES_FOR_SUMMARY}`);
+    return;
+  }
 
   const existing = await summaryRepo.getByConversation(conversationId);
   if (existing && !isStaleSummary(existing.created_at, substantive.length)) {
+    console.info("[SOUL] skip summary: existing summary is not stale");
     return;
   }
 
@@ -58,9 +62,7 @@ ${transcript}`;
       parsed.summary,
       parsed.keywords,
     );
-    if (existing) {
-      console.info("[SOUL] summary updated (conversation grew)");
-    }
+    console.info(`[SOUL] summary ${existing ? "updated" : "created"} for ${conversationId}`);
   } catch (e) {
     console.error("[SOUL] summary generation failed:", e);
   }

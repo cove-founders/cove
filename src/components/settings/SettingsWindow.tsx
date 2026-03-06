@@ -1,16 +1,18 @@
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
-import { Blocks, FolderOpen, Settings, Palette } from "lucide-react";
+import { Blocks, Brain, FolderOpen, Settings, Palette, Wand2, Wrench } from "lucide-react";
 import { ProvidersPage } from "./ProvidersPage";
 import { GeneralPage } from "./GeneralPage";
 import { WorkspacesPage } from "./WorkspacesPage";
+import { SoulPage } from "./SoulPage";
 
 const TABS = [
   { id: "providers" as const, labelKey: "settings.tabs.providers", icon: Blocks },
   { id: "general" as const, labelKey: "settings.tabs.general", icon: Settings },
   { id: "appearance" as const, labelKey: "settings.tabs.appearance", icon: Palette },
   { id: "workspaces" as const, labelKey: "settings.tabs.workspaces", icon: FolderOpen },
+  { id: "soul" as const, labelKey: "settings.tabs.soul", icon: Brain },
 ] as const;
 
 export function SettingsWindow() {
@@ -64,6 +66,7 @@ export function SettingsWindow() {
           </div>
         )}
         {tab === "workspaces" && <WorkspacesPage />}
+        {tab === "soul" && <SoulPage />}
       </div>
     </div>
   );

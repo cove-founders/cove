@@ -30,13 +30,15 @@ pub async fn officellm_call(
     app: tauri::AppHandle,
     cmd: String,
     args: Vec<String>,
+    workdir: String,
 ) -> Result<CommandResult, String> {
     let home = compute_home(&app)?;
+    let wd = std::path::PathBuf::from(&workdir);
     tauri::async_runtime::spawn_blocking(move || {
         if server::has_session() {
             server::call(&cmd, &args)
         } else {
-            cli::call(&cmd, &args, &home)
+            cli::call(&cmd, &args, &home, &wd)
         }
     })
     .await
@@ -80,7 +82,7 @@ pub async fn officellm_doctor(app: tauri::AppHandle) -> Result<CommandResult, St
     let home = compute_home(&app)?;
     let home_str = home.to_string_lossy().to_string();
     let mut result = tauri::async_runtime::spawn_blocking(move || {
-        cli::call("doctor", &[], &home)
+        cli::call("doctor", &[], &home, &home)
     })
     .await
     .map_err(|e| format!("后台线程错误: {e}"))??;
