@@ -10,7 +10,7 @@ export const settingsTool = tool({
 - general: locale (zh|en), sendShortcut (enter|modifierEnter)
 - skills: enabled (comma-separated names), dirPaths
 - provider: enabled, api_key, base_url (use provider_type to identify)
-- assistant: name, model, temperature, top_p, max_tokens, frequency_penalty, presence_penalty, tools_enabled, web_search_enabled, system_instruction (use assistant_name to identify)
+- assistant: name, model, temperature, top_p, max_tokens, frequency_penalty, presence_penalty, tools_enabled, web_search_enabled, system_instruction, trust_mode (use assistant_name to identify)
 
 Actions: get (single key), set (change value), list (show all in category)`,
   inputSchema: z.object({
