@@ -223,6 +223,8 @@ export function FileTreeItem({
           <button
             ref={rowRef}
             type="button"
+            data-tree-path={path}
+            data-tree-is-dir={String(isDir)}
             onClick={handleClick}
             draggable
             onDragStart={(e) => onDnDStart?.(e, path)}
