@@ -200,6 +200,17 @@ export function FileTreePanel() {
     });
   }, []);
 
+  // Wrappers that sync focusedPath with clicks so keyboard nav works
+  const handleSelectFile = useCallback((path: string) => {
+    setSelected(path);
+    setFocusedPath(path);
+  }, [setSelected]);
+
+  const handleToggleExpand = useCallback((path: string) => {
+    onToggleExpand(path);
+    setFocusedPath(path);
+  }, [onToggleExpand]);
+
   const onLoadChildren = useCallback((path: string, entries: ListDirEntry[]) => {
     setLoadedChildren((prev) => ({ ...prev, [path]: entries }));
   }, []);
@@ -245,8 +256,8 @@ export function FileTreePanel() {
     loadedChildren,
     focusedPath,
     setFocusedPath,
-    onToggleExpand,
-    onSelectFile: setSelected,
+    onToggleExpand: handleToggleExpand,
+    onSelectFile: handleSelectFile,
     onRename,
     onDelete: dialogs.onDelete,
   });
@@ -395,8 +406,8 @@ export function FileTreePanel() {
                     editingPath={editingPath}
                     clipboardSourcePath={clipboard.sourcePath}
                     clipboardMode={clipboard.mode}
-                    onToggleExpand={onToggleExpand}
-                    onSelectFile={setSelected}
+                    onToggleExpand={handleToggleExpand}
+                    onSelectFile={handleSelectFile}
                     onLoadChildren={onLoadChildren}
                     onNewFile={dialogs.onNewFile}
                     onNewFolder={dialogs.onNewFolder}
