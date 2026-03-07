@@ -50,6 +50,71 @@ Use `bash` for system interaction:
 
 **Not available**: `fetch`, `require`, `import`, `process`, `fs`, `XMLHttpRequest`.
 
+## JS Code Conventions
+
+### Keep it short
+
+Target 10-30 lines. Over 40 lines means you should reconsider the approach (split into multiple tool calls, or use a dedicated tool instead). Use `Array.map/filter/reduce/forEach`, destructuring, template literals, and ternaries to stay concise.
+
+### Structure with functions
+
+Extract repeated logic into helper functions at the top. Main logic goes at the bottom, calling helpers.
+
+```javascript
+// helper at top
+const lineCount = (text) => text.split("\n").length;
+
+// main logic at bottom
+const files = workspace.glob("src/**/*.ts");
+const counts = files.map(f => ({ file: f, lines: lineCount(workspace.readFile(f)) }));
+console.log(JSON.stringify(counts, null, 2));
+```
+
+### Error handling
+
+Wrap `workspace.*` calls in try/catch. Log context (file path, operation) so you can self-correct on retry.
+
+```javascript
+try {
+  const content = workspace.readFile(path);
+  // ...
+} catch (e) {
+  console.error(`readFile ${path}: ${e.message}`);
+}
+```
+
+### Output formatting
+
+- Data results: `console.log(JSON.stringify(result, null, 2))` once at end.
+- Summaries: clear labels like `console.log("Total: " + count)`.
+- Don't scatter `console.log` throughout the code. Collect results first, output once.
+
+### Use workspace APIs, don't reinvent
+
+| Do this | Not this |
+|---------|----------|
+| `workspace.exists(path)` | try-read-catch to check existence |
+| `workspace.glob("**/*.ts")` | recursive listDir + filter |
+| `workspace.stat(path).size` | read file to check length |
+| `workspace.copyFile(src, dst)` | read + write to copy |
+| `workspace.appendFile(path, line)` | read + concat + write to append |
+
+### officellm patterns
+
+- Always `JSON.parse()` the return value of `workspace.officellm()`.
+- Always check `status` before `open`. Always `close` when done.
+- For multi-step workflows: open -> operate -> save -> close.
+- Wrap officellm calls in try/catch; log the command name in error messages.
+
+```javascript
+try {
+  const res = JSON.parse(workspace.officellm("extract-text", { i: "report.docx" }));
+  if (res.status === "success") console.log(res.data.text);
+} catch (e) {
+  console.error(`officellm extract-text: ${e.message}`);
+}
+```
+
 ## workspace.officellm API (advanced: multi-step programmatic workflows)
 
 When you need to combine multiple office operations in a single programmatic sequence
@@ -84,15 +149,44 @@ workspace.officellm("close", {});                          // close session
 
 ## Example
 
-```javascript
-// Extract text from a Word document
-const res = JSON.parse(workspace.officellm("extract-text", { i: "report.docx" }));
-if (res.status === "success") {
-  console.log(res.data.text);
-}
+Bad -- manual recursion, no error handling, scattered output, 20+ lines:
 
-// Replace text and save as new file
-workspace.officellm("replace-text", { i: "doc.docx", o: "doc-new.docx", find: "foo", replace: "bar" });
+```javascript
+// DON'T do this
+const dirs = ["."];
+let total = 0;
+while (dirs.length > 0) {
+  const d = dirs.pop();
+  const entries = workspace.listDir(d);
+  for (const e of entries) {
+    const p = d + "/" + e;
+    if (e.endsWith(".ts")) {
+      const c = workspace.readFile(p);
+      const n = c.split("\n").length;
+      console.log(p + ": " + n);
+      total += n;
+    } else {
+      try { dirs.push(...workspace.listDir(p).map(x => p + "/" + x)); } catch(_) {}
+    }
+  }
+}
+console.log("total: " + total);
+```
+
+Good -- workspace APIs, helpers, structured output, <15 lines:
+
+```javascript
+// DO this
+const lineCount = (path) => workspace.readFile(path).split("\n").length;
+
+const files = workspace.glob("**/*.ts");
+const counts = files.map(f => {
+  try { return { file: f, lines: lineCount(f) }; }
+  catch (e) { console.error(`read ${f}: ${e.message}`); return null; }
+}).filter(Boolean);
+
+const total = counts.reduce((sum, c) => sum + c.lines, 0);
+console.log(JSON.stringify({ total, fileCount: counts.length, files: counts }, null, 2));
 ```
 
 All paths are relative to workspace root.
