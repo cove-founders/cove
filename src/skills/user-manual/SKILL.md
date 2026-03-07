@@ -82,7 +82,6 @@ Open with `Cmd+,` or app menu.
 | General | Language, default model |
 | Skills | Browse, enable/disable, edit, delete skills |
 | Tools | View available tools |
-| Appearance | Theme (not yet implemented) |
 | Workspaces | Manage workspace directories |
 
 ## Keyboard Shortcuts
