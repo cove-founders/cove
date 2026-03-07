@@ -201,7 +201,7 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
           <UserAttachmentList attachments={attachments} />
         )}
         {content.trim() && (
-          <div className="rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap">
+          <div className="rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap break-words">
             {renderContentWithMentions(content)}
           </div>
         )}

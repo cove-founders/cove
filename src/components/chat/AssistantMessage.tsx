@@ -271,7 +271,7 @@ export function AssistantMessage({
                   ))}
                 </div>
               )}
-              <div className="text-[14px] leading-relaxed">
+              <div className="text-[14px] leading-relaxed break-words">
                 {renderMessageContent(content ?? "", !!streaming, true)}
                 {streaming && !content && (toolCalls?.length ?? 0) === 0 && (
                   <span className="cursor-blink ml-0.5 inline-block h-4 w-0.5 bg-brand align-middle" aria-hidden />
