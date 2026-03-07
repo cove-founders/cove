@@ -79,6 +79,17 @@ export function useFileTreeDnD({ workspaceRoot, containerRef }: UseFileTreeDnDPa
     workspaceRootRef.current = workspaceRoot;
   }, [workspaceRoot]);
 
+  /** Check if a CSS-pixel position is inside the file tree container. */
+  const isInsideContainer = useCallback(
+    (cssX: number, cssY: number): boolean => {
+      const container = containerRef.current;
+      if (!container) return false;
+      const rect = container.getBoundingClientRect();
+      return cssX >= rect.left && cssX <= rect.right && cssY >= rect.top && cssY <= rect.bottom;
+    },
+    [containerRef],
+  );
+
   // --- Tauri native drag-drop (external files from OS) ---
   useEffect(() => {
     const unlisten = getCurrentWebview().onDragDropEvent((event) => {
@@ -91,15 +102,19 @@ export function useFileTreeDnD({ workspaceRoot, containerRef }: UseFileTreeDnDPa
         const ratio = window.devicePixelRatio || 1;
         const cssX = pos.x / ratio;
         const cssY = pos.y / ratio;
+
+        if (!isInsideContainer(cssX, cssY)) {
+          setDropTargetPath(null);
+          return;
+        }
+
         const el = document.elementFromPoint(cssX, cssY);
         const target = findTreeTarget(el);
 
         if (target) {
-          // Only highlight directories as drop targets
           if (target.isDir) {
             setDropTargetPath(target.path);
           } else {
-            // For files, use the parent directory
             const parentPath = target.path.includes("/")
               ? target.path.replace(/\/[^/]+$/, "")
               : "";
@@ -109,17 +124,19 @@ export function useFileTreeDnD({ workspaceRoot, containerRef }: UseFileTreeDnDPa
           setDropTargetPath(null);
         }
       } else if (event.payload.type === "drop") {
-        if (!wsRoot) {
+        const pos = event.payload.position;
+        const ratio = window.devicePixelRatio || 1;
+        const cssX = pos.x / ratio;
+        const cssY = pos.y / ratio;
+
+        if (!wsRoot || !isInsideContainer(cssX, cssY)) {
           setIsExternalDragOver(false);
           setDropTargetPath(null);
           return;
         }
 
         const paths = event.payload.paths;
-        // Determine target directory from current dropTargetPath
-        const pos = event.payload.position;
-        const ratio = window.devicePixelRatio || 1;
-        const el = document.elementFromPoint(pos.x / ratio, pos.y / ratio);
+        const el = document.elementFromPoint(cssX, cssY);
         const target = findTreeTarget(el);
         let targetDir = "";
         if (target) {
@@ -145,7 +162,7 @@ export function useFileTreeDnD({ workspaceRoot, containerRef }: UseFileTreeDnDPa
     return () => {
       void unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [isInsideContainer]);
 
   // --- Internal HTML5 DnD (tree rearrangement) ---
   const onDragStart = useCallback((e: React.DragEvent, path: string) => {
@@ -239,9 +256,6 @@ export function useFileTreeDnD({ workspaceRoot, containerRef }: UseFileTreeDnDPa
     },
     [workspaceRoot],
   );
-
-  // Suppress unused ref - containerRef is kept for future hit-testing scoping
-  void containerRef;
 
   return {
     draggedPath,

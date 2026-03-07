@@ -49,7 +49,9 @@ function makeDragEvent(
 }
 
 function makeContainerRef() {
-  return { current: document.createElement("div") } as React.RefObject<HTMLDivElement | null>;
+  const div = document.createElement("div");
+  div.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0, toJSON: () => ({}) });
+  return { current: div } as React.RefObject<HTMLDivElement | null>;
 }
 
 describe("useFileTreeDnD", () => {
