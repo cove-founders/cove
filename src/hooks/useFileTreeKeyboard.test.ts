@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
-import { flattenVisible, isEditableTarget } from "./useFileTreeKeyboard";
+import { renderHook, act } from "@testing-library/react";
+import { flattenVisible, isEditableTarget, useFileTreeKeyboard } from "./useFileTreeKeyboard";
 
 const mockEntries = [
   { name: "src", path: "src", isDir: true, mtimeSecs: 0 },
@@ -181,5 +182,196 @@ describe("handleKeyDown editable guard", () => {
       const event = createKeyEvent(key, div);
       expect(isEditableTarget(event)).toBe(false);
     }
+  });
+});
+
+// ── handleKeyDown via renderHook ────────────────────────────────────────────
+
+function createKeyEvent(
+  key: string,
+  overrides: Partial<React.KeyboardEvent> = {},
+): React.KeyboardEvent {
+  return {
+    key,
+    target: document.createElement("div"),
+    metaKey: false,
+    ctrlKey: false,
+    altKey: false,
+    preventDefault: vi.fn(),
+    ...overrides,
+  } as unknown as React.KeyboardEvent;
+}
+
+function hookParams(overrides: Partial<Parameters<typeof useFileTreeKeyboard>[0]> = {}) {
+  return {
+    rootEntries: mockEntries,
+    expandedDirs: new Set<string>(),
+    loadedChildren: {},
+    focusedPath: null as string | null,
+    setFocusedPath: vi.fn(),
+    onToggleExpand: vi.fn(),
+    onSelectFile: vi.fn(),
+    onRename: vi.fn(),
+    onDelete: vi.fn(),
+    ...overrides,
+  };
+}
+
+describe("useFileTreeKeyboard handleKeyDown", () => {
+  it("ArrowDown moves focus to the first entry when nothing focused", () => {
+    const params = hookParams();
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("ArrowDown"));
+    });
+
+    expect(params.setFocusedPath).toHaveBeenCalledWith("src");
+  });
+
+  it("ArrowDown moves focus to the next entry", () => {
+    const params = hookParams({ focusedPath: "src" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("ArrowDown"));
+    });
+
+    expect(params.setFocusedPath).toHaveBeenCalledWith("README.md");
+  });
+
+  it("ArrowUp moves focus to the previous entry", () => {
+    const params = hookParams({ focusedPath: "README.md" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("ArrowUp"));
+    });
+
+    expect(params.setFocusedPath).toHaveBeenCalledWith("src");
+  });
+
+  it("ArrowRight expands a collapsed directory", () => {
+    const params = hookParams({ focusedPath: "src" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("ArrowRight"));
+    });
+
+    expect(params.onToggleExpand).toHaveBeenCalledWith("src");
+  });
+
+  it("ArrowRight moves to first child when directory is expanded", () => {
+    const params = hookParams({
+      focusedPath: "src",
+      expandedDirs: new Set(["src"]),
+      loadedChildren: mockChildren,
+    });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("ArrowRight"));
+    });
+
+    expect(params.setFocusedPath).toHaveBeenCalledWith("src/index.ts");
+  });
+
+  it("ArrowLeft collapses an expanded directory", () => {
+    const params = hookParams({
+      focusedPath: "src",
+      expandedDirs: new Set(["src"]),
+      loadedChildren: mockChildren,
+    });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("ArrowLeft"));
+    });
+
+    expect(params.onToggleExpand).toHaveBeenCalledWith("src");
+  });
+
+  it("ArrowLeft moves to parent directory for nested entry", () => {
+    const params = hookParams({
+      focusedPath: "src/index.ts",
+      expandedDirs: new Set(["src"]),
+      loadedChildren: mockChildren,
+    });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("ArrowLeft"));
+    });
+
+    expect(params.setFocusedPath).toHaveBeenCalledWith("src");
+  });
+
+  it("Enter opens a file", () => {
+    const params = hookParams({ focusedPath: "README.md" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("Enter"));
+    });
+
+    expect(params.onSelectFile).toHaveBeenCalledWith("README.md");
+  });
+
+  it("Enter toggles a directory", () => {
+    const params = hookParams({ focusedPath: "src" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("Enter"));
+    });
+
+    expect(params.onToggleExpand).toHaveBeenCalledWith("src");
+  });
+
+  it("F2 triggers rename on focused entry", () => {
+    const params = hookParams({ focusedPath: "README.md" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("F2"));
+    });
+
+    expect(params.onRename).toHaveBeenCalledWith("README.md");
+  });
+
+  it("Delete triggers delete on focused entry", () => {
+    const params = hookParams({ focusedPath: "README.md" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("Delete"));
+    });
+
+    expect(params.onDelete).toHaveBeenCalledWith("README.md", "README.md");
+  });
+
+  it("ignores keys with modifier (meta/ctrl/alt)", () => {
+    const params = hookParams({ focusedPath: "src" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(createKeyEvent("ArrowDown", { metaKey: true }));
+    });
+
+    expect(params.setFocusedPath).not.toHaveBeenCalled();
+  });
+
+  it("ignores keys when target is editable", () => {
+    const params = hookParams({ focusedPath: "src" });
+    const { result } = renderHook(() => useFileTreeKeyboard(params));
+
+    act(() => {
+      result.current.handleKeyDown(
+        createKeyEvent("ArrowDown", { target: document.createElement("input") }),
+      );
+    });
+
+    expect(params.setFocusedPath).not.toHaveBeenCalled();
   });
 });

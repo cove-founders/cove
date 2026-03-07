@@ -115,6 +115,7 @@ export function FileTreeItem({
   const isFocused = focusedPath === path;
   const isCut = clipboardMode === "cut" && clipboardSourcePath === path;
   const inputRef = useRef<HTMLInputElement>(null);
+  const rowRef = useRef<HTMLButtonElement>(null);
 
   const handleClick = useCallback(() => {
     if (isEditing) return;
@@ -140,6 +141,12 @@ export function FileTreeItem({
       inputRef.current.select();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    if (isFocused && rowRef.current) {
+      rowRef.current.scrollIntoView({ block: "nearest" });
+    }
+  }, [isFocused]);
 
   // Suppress unused param - onLoadChildren kept for API compatibility
   void onLoadChildren;
@@ -214,6 +221,7 @@ export function FileTreeItem({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
+            ref={rowRef}
             type="button"
             onClick={handleClick}
             draggable
@@ -227,7 +235,8 @@ export function FileTreeItem({
               isSelected ? "font-medium text-foreground" : "text-foreground-secondary hover:bg-background-tertiary hover:text-foreground",
               isDragged && "opacity-40",
               isDropTarget && "ring-1 ring-accent/50 bg-accent/5",
-              isFocused && "ring-1 ring-accent/40",
+              isFocused && !isSelected && "bg-background-tertiary/60 text-foreground",
+              isFocused && "ring-1 ring-accent/60",
               isCut && "opacity-50",
             )}
           >
