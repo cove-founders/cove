@@ -119,19 +119,13 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
   toggleFilePanel: () => {
     set((s) => {
       if (s.filePanelOpen) return { filePanelClosing: true };
-      const reopen: Record<string, boolean> = { filePanelOpen: true, filePanelOpening: true };
-      if (!s.fileTreeOpen && !s.filePreviewOpen) reopen.filePreviewOpen = true;
-      return reopen;
+      return { filePanelOpen: true, filePanelOpening: true, fileTreeOpen: true };
     });
     persistLayout(get());
   },
   setFilePanelOpen: (open) => {
     if (open) {
-      set((s) => {
-        const patch: Record<string, boolean> = { filePanelOpen: true };
-        if (!s.fileTreeOpen && !s.filePreviewOpen) patch.filePreviewOpen = true;
-        return patch;
-      });
+      set({ filePanelOpen: true, fileTreeOpen: true });
     } else {
       set({ filePanelOpen: false });
     }
@@ -164,7 +158,7 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
       leftSidebarWidth: config.leftSidebarWidth,
       chatWidth: config.chatWidth,
       filePanelOpen: config.filePanelOpen,
-      fileTreeOpen: config.fileTreeOpen,
+      fileTreeOpen: config.filePanelOpen ? true : config.fileTreeOpen,
       filePreviewOpen: config.filePreviewOpen,
       fileTreeWidth: config.fileTreeWidth,
       filePreviewWidth: config.filePreviewWidth,

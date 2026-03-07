@@ -53,10 +53,24 @@ vi.mock("@/stores/filePreviewStore", () => ({
   dirOfPath: (p: string) => (p.includes("/") ? p.replace(/\/[^/]+$/, "") : ""),
 }));
 
-vi.mock("@/stores/layoutStore", () => ({
-  useLayoutStore: (sel: (s: Record<string, unknown>) => unknown) =>
-    sel({ fileTreeShowHidden: false, setFileTreeShowHidden: vi.fn() }),
-}));
+const { mockLayoutState } = vi.hoisted(() => {
+  const mockLayoutState = {
+    fileTreeShowHidden: false,
+    setFileTreeShowHidden: vi.fn(),
+    setFileTreeOpen: vi.fn(),
+    setFilePreviewOpen: vi.fn(),
+    filePreviewOpen: false,
+  };
+  return { mockLayoutState };
+});
+
+vi.mock("@/stores/layoutStore", () => {
+  const store = Object.assign(
+    (sel: (s: Record<string, unknown>) => unknown) => sel(mockLayoutState),
+    { getState: () => mockLayoutState },
+  );
+  return { useLayoutStore: store };
+});
 
 // ── Mock hooks ──────────────────────────────────────────────────────────────
 

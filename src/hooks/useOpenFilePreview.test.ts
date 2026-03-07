@@ -66,14 +66,15 @@ describe("useOpenFilePreview", () => {
       expect(useFilePreviewStore.getState().selectedPath).toBe("src/main.ts");
     });
 
-    it("does not modify fileTreeOpen when tree is collapsed", () => {
-      useLayoutStore.setState({ filePanelOpen: false, fileTreeOpen: false });
+    it("resets both sub-panels when reopening panel", () => {
+      useLayoutStore.setState({ filePanelOpen: false, fileTreeOpen: false, filePreviewOpen: false });
       const { result } = renderHook(() => useOpenFilePreview());
 
       act(() => result.current.openPreview("/abs/file.ts"));
 
       expect(useLayoutStore.getState().filePanelOpen).toBe(true);
-      expect(useLayoutStore.getState().fileTreeOpen).toBe(false);
+      expect(useLayoutStore.getState().fileTreeOpen).toBe(true);
+      expect(useLayoutStore.getState().filePreviewOpen).toBe(true);
     });
 
     it("does not toggle filePanelOpen when panel is already open", () => {

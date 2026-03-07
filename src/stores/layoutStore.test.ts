@@ -244,20 +244,42 @@ describe("layoutStore", () => {
   });
 
   describe("toggleFilePanel re-open guarantee", () => {
-    it("ensures at least one sub-panel is open when re-opening", () => {
+    it("opens file tree but does not force preview open", () => {
       useLayoutStore.setState({ filePanelOpen: false, fileTreeOpen: false, filePreviewOpen: false });
       useLayoutStore.getState().toggleFilePanel();
-      expect(useLayoutStore.getState().filePanelOpen).toBe(true);
-      expect(useLayoutStore.getState().filePreviewOpen).toBe(true);
+      const s = useLayoutStore.getState();
+      expect(s.filePanelOpen).toBe(true);
+      expect(s.fileTreeOpen).toBe(true);
+      expect(s.filePreviewOpen).toBe(false);
+    });
+
+    it("preserves filePreviewOpen state when re-opening", () => {
+      useLayoutStore.setState({ filePanelOpen: false, fileTreeOpen: false, filePreviewOpen: true });
+      useLayoutStore.getState().toggleFilePanel();
+      const s = useLayoutStore.getState();
+      expect(s.filePanelOpen).toBe(true);
+      expect(s.fileTreeOpen).toBe(true);
+      expect(s.filePreviewOpen).toBe(true);
     });
   });
 
   describe("setFilePanelOpen re-open guarantee", () => {
-    it("ensures at least one sub-panel is open", () => {
+    it("opens file tree but does not force preview open", () => {
       useLayoutStore.setState({ filePanelOpen: false, fileTreeOpen: false, filePreviewOpen: false });
       useLayoutStore.getState().setFilePanelOpen(true);
-      expect(useLayoutStore.getState().filePanelOpen).toBe(true);
-      expect(useLayoutStore.getState().filePreviewOpen).toBe(true);
+      const s = useLayoutStore.getState();
+      expect(s.filePanelOpen).toBe(true);
+      expect(s.fileTreeOpen).toBe(true);
+      expect(s.filePreviewOpen).toBe(false);
+    });
+
+    it("preserves filePreviewOpen state when opening", () => {
+      useLayoutStore.setState({ filePanelOpen: false, fileTreeOpen: false, filePreviewOpen: true });
+      useLayoutStore.getState().setFilePanelOpen(true);
+      const s = useLayoutStore.getState();
+      expect(s.filePanelOpen).toBe(true);
+      expect(s.fileTreeOpen).toBe(true);
+      expect(s.filePreviewOpen).toBe(true);
     });
   });
 
@@ -294,6 +316,25 @@ describe("layoutStore", () => {
       expect(s.fileTreeWidth).toBe(300);
       expect(s.filePreviewWidth).toBe(400);
       expect(s.fileTreeShowHidden).toBe(false);
+    });
+
+    it("ensures file tree open when panel is open, preserves preview state", async () => {
+      vi.mocked(readConfig).mockResolvedValue({
+        leftSidebarOpen: true,
+        leftSidebarWidth: 260,
+        chatWidth: 640,
+        filePanelOpen: true,
+        fileTreeOpen: false,
+        filePreviewOpen: false,
+        fileTreeWidth: 260,
+        filePreviewWidth: 360,
+        fileTreeShowHidden: true,
+      });
+      await useLayoutStore.getState().init();
+      const s = useLayoutStore.getState();
+      expect(s.filePanelOpen).toBe(true);
+      expect(s.fileTreeOpen).toBe(true);
+      expect(s.filePreviewOpen).toBe(false);
     });
   });
 });
