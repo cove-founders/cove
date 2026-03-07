@@ -20,6 +20,7 @@ import {
 } from "./AssistantMessage";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
+import { renderContentWithMentions } from "@/lib/render-mentions";
 
 const EMPTY_ATTACHMENTS: Attachment[] = [];
 
@@ -201,7 +202,7 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
         )}
         {content.trim() && (
           <div className="rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap">
-            {content}
+            {renderContentWithMentions(content)}
           </div>
         )}
         {/* 操作图标：仅悬停时渲染 DOM，避免 CSS 被覆盖导致不隐藏 */}

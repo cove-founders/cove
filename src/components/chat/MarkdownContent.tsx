@@ -7,6 +7,8 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import type { Components } from "react-markdown";
 import { CodeBlock, reactNodeToDisplayString } from "./CodeBlock";
+import { detectPreviewableFilePath } from "@/lib/detect-file-path";
+import { FilePathChip } from "@/components/common/FilePathChip";
 
 const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath];
 const rehypePluginsBase = [rehypeKatex];
@@ -40,6 +42,10 @@ const markdownComponents: Components = {
     const safeChildren =
       typeof children === "string" ? children : reactNodeToDisplayString(children ?? "");
     if (isInline) {
+      const filePath = detectPreviewableFilePath(safeChildren);
+      if (filePath) {
+        return <FilePathChip path={filePath} compact />;
+      }
       return (
         <code
           className="rounded bg-background-tertiary px-1 py-0.5 font-mono text-[13px]"

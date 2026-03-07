@@ -1,5 +1,5 @@
 // FILE_SIZE_EXCEPTION: ToolCallBlock is a complex component with many tightly coupled sub-components
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Wrench,
@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils";
 import type { ToolCallInfo } from "@/stores/chatStore";
 import { usePermissionStore } from "@/stores/permissionStore";
 import type { PendingPermission } from "@/stores/permissionStore";
+import { FilePathChip } from "@/components/common/FilePathChip";
+import { extractFilePathsFromResult, extractPathFromDiffIntro } from "@/lib/extract-file-paths";
 
 import "prismjs/components/prism-bash";
 
@@ -101,7 +103,10 @@ export function ResultContent({ result, toolName }: { result: unknown; toolName?
           <div className="rounded bg-background-tertiary/10 p-2 text-[11px] space-y-1">
             <div><span className="text-foreground-secondary">附件 ID：</span>{parsed.attachmentId ?? "—"}</div>
             <div><span className="text-foreground-secondary">文件名：</span>{parsed.name ?? "—"}</div>
-            <div className="break-all"><span className="text-foreground-secondary">文件路径：</span>{parsed.path ?? "—"}</div>
+            <div className="break-all">
+              <span className="text-foreground-secondary">文件路径：</span>
+              {parsed.path ? <FilePathChip path={parsed.path} /> : "—"}
+            </div>
             <div><span className="text-foreground-secondary">读取模式：</span>{modeLabel}</div>
             <div><span className="text-foreground-secondary">分块数量：</span>{parsed.chunkCount ?? 0}</div>
             <div><span className="text-foreground-secondary">是否截断：</span>{parsed.truncated ? "是" : "否"}</div>
@@ -132,6 +137,32 @@ export function ResultContent({ result, toolName }: { result: unknown; toolName?
   }
   const diff = extractDiffLines(result);
   if (!diff) {
+    // Check for extractable file paths in tool results (diagram, office, etc.)
+    const extractedPaths = toolName ? extractFilePathsFromResult(toolName, result) : [];
+    if (extractedPaths.length > 0) {
+      return (
+        <div
+          className={cn(
+            "rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap",
+            resultTextColorClass,
+          )}
+        >
+          {extractedPaths.reduce<{ lastEnd: number; nodes: React.ReactNode[] }>(
+            (acc, ep, i) => {
+              if (ep.start > acc.lastEnd) {
+                acc.nodes.push(<span key={`t${i}`}>{result.slice(acc.lastEnd, ep.start)}</span>);
+              }
+              acc.nodes.push(<FilePathChip key={`p${i}`} path={ep.path} compact />);
+              return { lastEnd: ep.end, nodes: acc.nodes };
+            },
+            { lastEnd: 0, nodes: [] },
+          ).nodes}
+          {extractedPaths[extractedPaths.length - 1]!.end < result.length && (
+            <span>{result.slice(extractedPaths[extractedPaths.length - 1]!.end)}</span>
+          )}
+        </div>
+      );
+    }
     return (
       <pre
         className={cn(
@@ -146,7 +177,20 @@ export function ResultContent({ result, toolName }: { result: unknown; toolName?
   return (
     <div className="space-y-1">
       {diff.intro && (
-        <p className="text-[11px] text-muted-foreground mb-1">{diff.intro}</p>
+        <p className="text-[11px] text-muted-foreground mb-1">
+          {(() => {
+            const introPath = extractPathFromDiffIntro(diff.intro);
+            if (!introPath) return diff.intro;
+            const idx = diff.intro.indexOf(introPath);
+            return (
+              <>
+                {diff.intro.slice(0, idx)}
+                <FilePathChip path={introPath} compact />
+                {diff.intro.slice(idx + introPath.length)}
+              </>
+            );
+          })()}
+        </p>
       )}
       <div className="mb-1 text-[11px] font-medium uppercase text-foreground-secondary">{t("tool.content")}</div>
       <div
@@ -197,15 +241,18 @@ export function ToolCallIcon({ toolName }: { toolName: string }) {
 }
 
 /** 标题栏摘要：让用户一眼知道工具正在处理什么 */
-export function getToolHeaderSummary(toolName: string, args: Record<string, unknown> | undefined): string | null {
+export function getToolHeaderSummary(toolName: string, args: Record<string, unknown> | undefined): React.ReactNode | null {
   if (!args) return null;
   if (toolName === "bash") {
     const desc = args.description;
     return typeof desc === "string" && desc.trim() ? desc.trim() : null;
   }
-  if (toolName === "read" || toolName === "edit") {
+  if (toolName === "read" || toolName === "edit" || toolName === "write") {
     const path = args.filePath;
-    return typeof path === "string" && path.trim() ? path.trim() : null;
+    if (typeof path === "string" && path.trim()) {
+      return <FilePathChip path={path.trim()} compact />;
+    }
+    return null;
   }
   if (toolName === "cove_interpreter") {
     const desc = args.description;
@@ -328,11 +375,13 @@ export function ToolCallArgsDisplay({
     const offset = args.offset as number | undefined;
     const limit = args.limit as number | undefined;
     const extra = [offset != null && `offset: ${offset}`, limit != null && `limit: ${limit}`].filter(Boolean).join(", ");
-    const pathText = `${filePath ?? "—"}${extra ? ` (${extra})` : ""}`;
     return (
       <div className="mb-2 space-y-1">
         <div className="text-[11px] font-medium text-foreground-secondary">{t("tool.path")}</div>
-        {streamReveal ? <StreamRevealText text={pathText} className={preClass} /> : <pre className={preClass}>{pathText}</pre>}
+        <div className="py-0.5">
+          {filePath ? <FilePathChip path={filePath} /> : <span className="text-[11px] text-foreground-tertiary">—</span>}
+          {extra && <span className="ml-1.5 text-[11px] text-foreground-tertiary">({extra})</span>}
+        </div>
       </div>
     );
   }
@@ -345,7 +394,9 @@ export function ToolCallArgsDisplay({
     return (
       <div className="mb-2 space-y-1">
         <div className="text-[11px] font-medium text-foreground-secondary">{t("tool.path")}</div>
-        {renderPre(filePath ?? "—")}
+        <div className="py-0.5">
+          {filePath ? <FilePathChip path={filePath} /> : <span className="text-[11px] text-foreground-tertiary">—</span>}
+        </div>
         {oldString != null && (
           <>
             <div className="mt-1 text-[11px] font-medium text-foreground-secondary">{t("tool.oldString")}</div>
@@ -420,7 +471,11 @@ export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo
           <Shield className="size-3 shrink-0 text-success" strokeWidth={1.5} />
         )}
         {toolSummary && (
-          <span className="min-w-0 max-w-[420px] truncate text-[13px] leading-none font-normal text-foreground-secondary">
+          <span
+            className="min-w-0 max-w-[420px] truncate text-[13px] leading-none font-normal text-foreground-secondary"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
             {toolSummary}
           </span>
         )}
