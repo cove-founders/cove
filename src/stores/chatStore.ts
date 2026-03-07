@@ -20,7 +20,7 @@ import { getFetchBlockForText, injectFetchBlockIntoLastUserMessage } from "./cha
 import { LAST_MODEL_KEY } from "./chat-retry-utils";
 import { runStreamLoop } from "./chat-stream-runner";
 import type { ToolCallInfo, DraftAttachment, MessagePart } from "./chat-types";
-import { cancelAllActiveCommands } from "@/lib/ai/tools/bash";
+import { cancelCommandsForConversation } from "@/lib/ai/tools/bash";
 import { runPostConversationTasks } from "@/lib/ai/post-conversation";
 import { i18n } from "@/i18n";
 import { buildAttachmentInjection } from "@/lib/attachment-injection";
@@ -242,7 +242,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
-      runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
+      messageRepo.getByConversation(conversationId).then((msgs) =>
+        runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
+      ).catch(() => {});
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });
@@ -331,7 +333,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
-      runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
+      messageRepo.getByConversation(conversationId).then((msgs) =>
+        runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
+      ).catch(() => {});
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });
@@ -406,7 +410,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
-      runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
+      messageRepo.getByConversation(conversationId).then((msgs) =>
+        runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
+      ).catch(() => {});
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });
@@ -420,9 +426,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   stopGeneration() {
-    cancelAllActiveCommands();
     const activeId = useDataStore.getState().activeConversationId;
-    if (activeId) useStreamStore.getState().abortStream(activeId);
+    if (activeId) {
+      cancelCommandsForConversation(activeId);
+      useStreamStore.getState().abortStream(activeId);
+    }
   },
 
   reset() {

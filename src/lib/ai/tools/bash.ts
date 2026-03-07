@@ -10,13 +10,22 @@ const MAX_OUTPUT_CHARS = 30_000;
 const HEAD_CHARS = 15_000;
 const TAIL_CHARS = 15_000;
 
-/** Track active cancel tokens so stopGeneration can cancel running commands. */
-const activeTokens = new Set<string>();
+/** Track active cancel tokens, mapped to conversationId for per-conversation cancellation. */
+const activeTokens = new Map<string, string>();
 
 /** Cancel all running bash commands. Called by chatStore.stopGeneration(). */
 export function cancelAllActiveCommands() {
-  for (const token of activeTokens) {
+  for (const token of activeTokens.keys()) {
     invoke("cancel_command", { token }).catch(() => {});
+  }
+}
+
+/** Cancel running bash commands for a specific conversation only. */
+export function cancelCommandsForConversation(conversationId: string) {
+  for (const [token, convId] of activeTokens) {
+    if (convId === conversationId) {
+      invoke("cancel_command", { token }).catch(() => {});
+    }
   }
 }
 
@@ -83,8 +92,9 @@ export const bashTool = tool({
       return "该命令被拒绝执行（安全策略）。不允许的指令：nc, telnet, rm -rf / 等危险操作。";
     }
 
+    const conversationId = useDataStore.getState().activeConversationId ?? "";
+
     if (!isSafe(command)) {
-      const conversationId = useDataStore.getState().activeConversationId ?? "";
       const pattern = getBashCommandPattern(command);
       const allowed = await usePermissionStore.getState().ask(
         conversationId,
@@ -101,7 +111,7 @@ export const bashTool = tool({
     );
 
     const cancelToken = crypto.randomUUID();
-    activeTokens.add(cancelToken);
+    activeTokens.set(cancelToken, conversationId);
 
     try {
       const result = await invoke<RunCommandResult>("run_command", {
