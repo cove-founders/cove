@@ -17,8 +17,11 @@ interface LayoutState {
   fileTreeWidth: number;
   filePreviewWidth: number;
   fileTreeOpen: boolean;
+  filePreviewOpen: boolean;
   toggleFileTree: () => void;
   setFileTreeOpen: (open: boolean) => void;
+  toggleFilePreview: () => void;
+  setFilePreviewOpen: (open: boolean) => void;
   fileTreeShowHidden: boolean;
   setFileTreeShowHidden: (show: boolean) => void;
   toggleFilePanel: () => void;
@@ -45,6 +48,7 @@ function persistLayout(state: LayoutState): void {
     chatWidth: state.chatWidth,
     filePanelOpen: state.filePanelOpen,
     fileTreeOpen: state.fileTreeOpen,
+    filePreviewOpen: state.filePreviewOpen,
     fileTreeWidth: state.fileTreeWidth,
     filePreviewWidth: state.filePreviewWidth,
     fileTreeShowHidden: state.fileTreeShowHidden,
@@ -76,12 +80,35 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
   fileTreeWidth: 260,
   filePreviewWidth: 360,
   fileTreeOpen: true,
+  filePreviewOpen: true,
   toggleFileTree: () => {
-    set((s) => ({ fileTreeOpen: !s.fileTreeOpen }));
+    set((s) => {
+      const next = !s.fileTreeOpen;
+      if (!next && !s.filePreviewOpen) return { fileTreeOpen: next, filePanelClosing: true };
+      return { fileTreeOpen: next };
+    });
     persistLayout(get());
   },
   setFileTreeOpen: (open) => {
-    set({ fileTreeOpen: open });
+    set((s) => {
+      if (!open && !s.filePreviewOpen) return { fileTreeOpen: open, filePanelClosing: true };
+      return { fileTreeOpen: open };
+    });
+    persistLayout(get());
+  },
+  toggleFilePreview: () => {
+    set((s) => {
+      const next = !s.filePreviewOpen;
+      if (!next && !s.fileTreeOpen) return { filePreviewOpen: next, filePanelClosing: true };
+      return { filePreviewOpen: next };
+    });
+    persistLayout(get());
+  },
+  setFilePreviewOpen: (open) => {
+    set((s) => {
+      if (!open && !s.fileTreeOpen) return { filePreviewOpen: open, filePanelClosing: true };
+      return { filePreviewOpen: open };
+    });
     persistLayout(get());
   },
   fileTreeShowHidden: true,
@@ -90,15 +117,18 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
     persistLayout(get());
   },
   toggleFilePanel: () => {
-    set((s) =>
-      s.filePanelOpen
-        ? { filePanelClosing: true }
-        : { filePanelOpen: true, filePanelOpening: true },
-    );
+    set((s) => {
+      if (s.filePanelOpen) return { filePanelClosing: true };
+      return { filePanelOpen: true, filePanelOpening: true, fileTreeOpen: true };
+    });
     persistLayout(get());
   },
   setFilePanelOpen: (open) => {
-    set({ filePanelOpen: open });
+    if (open) {
+      set({ filePanelOpen: true, fileTreeOpen: true });
+    } else {
+      set({ filePanelOpen: false });
+    }
     persistLayout(get());
   },
   confirmFilePanelClosed: () => {
@@ -128,7 +158,8 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
       leftSidebarWidth: config.leftSidebarWidth,
       chatWidth: config.chatWidth,
       filePanelOpen: config.filePanelOpen,
-      fileTreeOpen: config.fileTreeOpen,
+      fileTreeOpen: config.filePanelOpen ? true : config.fileTreeOpen,
+      filePreviewOpen: config.filePreviewOpen,
       fileTreeWidth: config.fileTreeWidth,
       filePreviewWidth: config.filePreviewWidth,
       fileTreeShowHidden: config.fileTreeShowHidden,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Code, Eye } from "lucide-react";
+import { Code, Eye, X } from "lucide-react";
 import { MarkdownContent } from "@/components/chat/MarkdownContent";
 import { CodeViewer } from "@/components/preview/CodeViewer";
 import { CsvViewer } from "@/components/preview/CsvViewer";
@@ -14,6 +14,7 @@ import { UnsupportedFallback } from "@/components/preview/UnsupportedFallback";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFilePreviewStore } from "@/stores/filePreviewStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { getPreviewKind } from "@/lib/preview-types";
 import { cn } from "@/lib/utils";
 import {
@@ -30,6 +31,7 @@ export function FilePreviewPanel() {
   const previewError = useFilePreviewStore((s) => s.previewError);
   const workspaceRoot = useWorkspaceStore((s) => s.activeWorkspace?.path ?? null);
   const { cached, loading, error } = usePreviewContent(selectedPath, workspaceRoot);
+  const setFilePreviewOpen = useLayoutStore((s) => s.setFilePreviewOpen);
   const [mdViewMode, setMdViewMode] = useState<"preview" | "code">("preview");
   const officeApps = useDetectOfficeApps();
   const openExternally = useOpenExternally(workspaceRoot, selectedPath);
@@ -137,6 +139,7 @@ export function FilePreviewPanel() {
           <div className="flex shrink-0 items-center gap-1">
           <OpenExternallyButton workspaceRoot={workspaceRoot} path={selectedPath} />
           <div className="flex rounded-lg border">
+
             <button
               type="button"
               onClick={() => setMdViewMode("preview")}
@@ -164,6 +167,14 @@ export function FilePreviewPanel() {
               {t("preview.codeTab")}
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setFilePreviewOpen(false)}
+            className="rounded-md p-1 text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
+            title={t("preview.closePreview")}
+          >
+            <X className="size-3.5" strokeWidth={1.5} />
+          </button>
           </div>
         </div>
         <ScrollArea className="min-h-0 flex-1 p-1.5">

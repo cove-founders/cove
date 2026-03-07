@@ -16,7 +16,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { ChevronsDownUp, Eye, EyeOff, FilePlus, RefreshCw, FolderPlus, Search, Clipboard } from "lucide-react";
+import { ChevronsDownUp, Eye, EyeOff, FilePlus, RefreshCw, FolderPlus, Search, Clipboard, X } from "lucide-react";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
@@ -55,6 +55,8 @@ export function FileTreePanel() {
   const setPendingExpandPath = useFilePreviewStore((s) => s.setPendingExpandPath);
   const fileTreeShowHidden = useLayoutStore((s) => s.fileTreeShowHidden);
   const setFileTreeShowHidden = useLayoutStore((s) => s.setFileTreeShowHidden);
+  const setFileTreeOpen = useLayoutStore((s) => s.setFileTreeOpen);
+  const setFilePreviewOpen = useLayoutStore((s) => s.setFilePreviewOpen);
 
   const [rootEntries, setRootEntries] = useState<ListDirEntry[] | null>(null);
   const [rootLoaded, setRootLoaded] = useState(false);
@@ -205,7 +207,8 @@ export function FileTreePanel() {
   const handleSelectFile = useCallback((path: string) => {
     setSelected(path);
     setFocusedPath(path);
-  }, [setSelected]);
+    if (!useLayoutStore.getState().filePreviewOpen) setFilePreviewOpen(true);
+  }, [setSelected, setFilePreviewOpen]);
 
   const handleToggleExpand = useCallback((path: string) => {
     onToggleExpand(path);
@@ -372,6 +375,14 @@ export function FileTreePanel() {
             title={t("preview.refreshDir")}
           >
             <RefreshCw className="size-3.5" strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFileTreeOpen(false)}
+            className="rounded p-1.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
+            title={t("preview.closeExplorer")}
+          >
+            <X className="size-3.5" strokeWidth={1.5} />
           </button>
         </div>
       </div>

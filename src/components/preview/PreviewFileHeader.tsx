@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ChevronDown, ExternalLink, X } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "react-i18next";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { BreadcrumbNav } from "./BreadcrumbNav";
 
 export interface OfficeAppInfo {
@@ -87,6 +88,7 @@ export function PreviewFileHeader({
   officeApps: OfficeAppInfo[];
 }) {
   const { t } = useTranslation();
+  const setFilePreviewOpen = useLayoutStore((s) => s.setFilePreviewOpen);
   const openExternally = useOpenExternally(workspaceRoot, path);
   const matchingApps = getMatchingApps(path, officeApps);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -177,6 +179,14 @@ export function PreviewFileHeader({
             <ExternalLink className="size-3" strokeWidth={1.5} />
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setFilePreviewOpen(false)}
+          className="rounded-md p-1 text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
+          title={t("preview.closePreview")}
+        >
+          <X className="size-3.5" strokeWidth={1.5} />
+        </button>
       </div>
     </div>
   );

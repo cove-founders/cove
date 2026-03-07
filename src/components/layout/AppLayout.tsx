@@ -40,6 +40,8 @@ export function AppLayout() {
   const confirmFilePanelClosed = useLayoutStore((s) => s.confirmFilePanelClosed);
   const confirmFilePanelOpened = useLayoutStore((s) => s.confirmFilePanelOpened);
   const fileTreeOpen = useLayoutStore((s) => s.fileTreeOpen);
+  const filePreviewOpen = useLayoutStore((s) => s.filePreviewOpen);
+  const selectedPath = useFilePreviewStore((s) => s.selectedPath);
   const fileTreeWidth = useLayoutStore((s) => s.fileTreeWidth);
   const setFileTreeWidth = useLayoutStore((s) => s.setFileTreeWidth);
 
@@ -51,17 +53,24 @@ export function AppLayout() {
   const closeConfirmedRef = useRef(false);
 
   // 关闭：测量总宽，rAF 后设目标，边框向右滑
+  // 若右侧子面板已全部关闭，chat column 已占满，无 width 变化 → 直接 confirm
   useLayoutEffect(() => {
     if (!filePanelClosing) {
       setChatColumnCloseTarget(null);
       closeConfirmedRef.current = false;
       return;
     }
-    const w = middleSectionRef.current?.offsetWidth;
+    const el = middleSectionRef.current;
+    const w = el?.offsetWidth;
     if (w == null || w <= 0) return;
+    const chatEl = el?.firstElementChild as HTMLElement | null;
+    if (chatEl && chatEl.offsetWidth >= w) {
+      confirmFilePanelClosed();
+      return;
+    }
     const id = requestAnimationFrame(() => setChatColumnCloseTarget(w));
     return () => cancelAnimationFrame(id);
-  }, [filePanelClosing]);
+  }, [filePanelClosing, confirmFilePanelClosed]);
 
   // 展开：先 100% 占满，rAF 后缩回 chatWidth，边框从左滑到右
   useLayoutEffect(() => {
@@ -138,6 +147,9 @@ export function AppLayout() {
       unlistenPromise.then((unlisten) => unlisten());
     };
   }, []);
+
+  const previewVisible = filePreviewOpen && selectedPath != null;
+  const isAnimating = filePanelClosing || filePanelOpening;
 
   const chatColumnTargetWidth: number | string = filePanelClosing && chatColumnCloseTarget != null
     ? chatColumnCloseTarget
@@ -223,11 +235,11 @@ export function AppLayout() {
         {filePanelOpen || filePanelClosing ? (
           <>
             <div
-              className="relative flex min-w-0 shrink-0 flex-col overflow-hidden border-r border-border transition-[width] duration-300 ease-out"
+              className={`relative flex min-w-0 flex-col overflow-hidden border-r border-border transition-[width] duration-300 ease-out${isAnimating || previewVisible ? " shrink-0" : " flex-1"}`}
               style={{
-                width: chatColumnTargetWidth,
+                width: isAnimating ? chatColumnTargetWidth : previewVisible ? chatWidth : undefined,
                 minWidth: CHAT_MIN,
-                willChange: filePanelClosing || filePanelOpening ? "width" : undefined,
+                willChange: isAnimating ? "width" : undefined,
               }}
               onTransitionEnd={handleChatColumnTransitionEnd}
             >
@@ -244,7 +256,7 @@ export function AppLayout() {
                 maxWidth={CHAT_MAX}
               />
             </div>
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+            <div className={`flex flex-col overflow-hidden bg-background${previewVisible ? " min-w-0 flex-1" : " shrink-0"}`}>
               <div
                 className="flex min-h-0 min-w-0 flex-1 flex-col"
                 style={{
@@ -260,21 +272,25 @@ export function AppLayout() {
                       style={{ width: fileTreeWidth, minWidth: FILE_TREE_MIN }}
                     >
                       <FileTreePanel />
-                      <ResizeHandle
-                        side="left"
-                        currentWidth={fileTreeWidth}
-                        onResize={setFileTreeWidth}
-                        minWidth={FILE_TREE_MIN}
-                        maxWidth={FILE_TREE_MAX}
-                      />
+                      {previewVisible && (
+                        <ResizeHandle
+                          side="left"
+                          currentWidth={fileTreeWidth}
+                          onResize={setFileTreeWidth}
+                          minWidth={FILE_TREE_MIN}
+                          maxWidth={FILE_TREE_MAX}
+                        />
+                      )}
                     </div>
                   )}
-                  <div
-                    className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${fileTreeOpen ? " border-l border-border" : ""}`}
-                    style={{ minWidth: FILE_PREVIEW_MIN }}
-                  >
-                    <FilePreviewPanel />
-                  </div>
+                  {filePreviewOpen && selectedPath != null && (
+                    <div
+                      className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${fileTreeOpen ? " border-l border-border" : ""}`}
+                      style={{ minWidth: FILE_PREVIEW_MIN }}
+                    >
+                      <FilePreviewPanel />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
