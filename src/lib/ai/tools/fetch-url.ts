@@ -3,32 +3,83 @@ import { z } from "zod/v4";
 import { invoke } from "@tauri-apps/api/core";
 import { type FetchUrlResult } from "@/lib/url-utils";
 
-/**
- * 供模型主动调用的抓取工具：当用户消息包含 URL 且未自动注入内容时，可用本工具抓取页面。
- */
+interface CookiePair {
+  name: string;
+  value: string;
+}
+
+function formatCookieHeader(pairs: CookiePair[]): string {
+  return pairs.map((p) => `${p.name}=${p.value}`).join("; ");
+}
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
 export const fetchUrlTool = tool({
   description:
-    "抓取指定 URL 的网页内容并转为 Markdown（规避 CORS）。当用户消息中有链接但未提供页面内容时，请用本工具获取后再回答。不支持 YouTube 字幕。",
+    "Fetch a URL's content as Markdown. Use when user provides a link but content is not available. " +
+    "If the site blocks access or returns low-quality content, the result may suggest retrying with browser cookies — " +
+    "ask the user for permission before doing so. Does not support YouTube transcripts.",
   inputSchema: z.object({
-    url: z.string().describe("要抓取的完整 URL（须以 http:// 或 https:// 开头）"),
-    timeoutMs: z.number().optional().describe("超时毫秒数，默认 15000"),
-    maxChars: z.number().optional().describe("内容最大字符数，默认 120000"),
+    url: z.string().describe("Full URL (must start with http:// or https://)"),
+    timeoutMs: z.number().optional().describe("Timeout in ms, default 30000"),
+    maxChars: z.number().optional().describe("Max content chars, default 120000"),
+    useCookies: z
+      .boolean()
+      .optional()
+      .describe("Set to true after user grants cookie permission for retry"),
   }),
-  execute: async ({ url, timeoutMs = 15000, maxChars = 120000 }) => {
+  execute: async ({ url, timeoutMs = 30000, maxChars = 120000, useCookies }) => {
     try {
+      let cookies: string | undefined;
+      if (useCookies) {
+        const domain = extractDomain(url);
+        if (domain) {
+          try {
+            const pairs = await invoke<CookiePair[]>("get_browser_cookies", { domain });
+            if (pairs.length > 0) {
+              cookies = formatCookieHeader(pairs);
+            }
+          } catch {
+            // Cookie reading failed, proceed without
+          }
+        }
+      }
+
       const res = await invoke<FetchUrlResult>("fetch_url", {
-        args: { url, timeoutMs, maxChars },
+        args: { url, timeoutMs, maxChars, cookies },
       });
+
       if (res.ok && res.content_md) {
         const title = res.title ? `[${res.title}](${res.source})` : res.source;
-        return `## ${title}\n\n${res.content_md}`;
+        const qualityNote = res.low_quality
+          ? "\n\n[Note: Content appears low quality, possibly anti-bot protection. " +
+            "Consider asking user to paste content directly.]"
+          : "";
+        return `## ${title}\n\n${res.content_md}${qualityNote}`;
       }
+
+      if (res.retry_with_cookies && !useCookies) {
+        return (
+          `${res.source} fetch failed: ${res.error ?? "blocked"}. ` +
+          "This site may require browser cookies to access. " +
+          "Ask the user: 'This site appears to block automated access. " +
+          "Would you like me to retry using your Chrome cookies for this domain?' " +
+          "If they agree, call fetch_url again with useCookies=true."
+        );
+      }
+
       return res.error
-        ? `${res.source} 抓取失败：${res.error}`
-        : `${res.source} 未返回可读内容`;
+        ? `${res.source} fetch failed: ${res.error}`
+        : `${res.source} returned no readable content`;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return `抓取失败：${msg}`;
+      return `Fetch failed: ${msg}`;
     }
   },
 });

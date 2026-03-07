@@ -10,7 +10,7 @@ export async function getFetchBlockForText(text: string): Promise<string> {
   for (const url of urls) {
     try {
       const res = await invoke<FetchUrlResult>("fetch_url", {
-        args: { url, timeoutMs: 15000, maxChars: 120000 },
+        args: { url, timeoutMs: 30000, maxChars: 120000 },
       });
       results.push(res);
     } catch (err) {
