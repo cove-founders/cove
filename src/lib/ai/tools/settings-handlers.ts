@@ -14,6 +14,7 @@ import {
   setEnabledSkillNames,
 } from "@/stores/skillsStore";
 import { useDataStore } from "@/stores/dataStore";
+import { usePermissionStore } from "@/stores/permissionStore";
 import { assistantRepo } from "@/db/repos/assistantRepo";
 import { verifyApiKey } from "@/lib/ai/model-verify";
 import { emit } from "@tauri-apps/api/event";
@@ -109,52 +110,33 @@ function setLayoutKey(
   if (!key || !value) return "key and value are required";
   const store = useLayoutStore.getState();
 
-  switch (key) {
-    case "leftSidebarOpen": {
-      const open = parseBool(value);
-      if (open === null) return `Invalid boolean: ${value}`;
-      if (open !== config.leftSidebarOpen) store.toggleLeftSidebar();
-      return `leftSidebarOpen set to: ${open}`;
-    }
-    case "leftSidebarWidth": {
-      const n = parseNumber(value);
-      if (n === null) return `Invalid number: ${value}`;
-      store.setLeftSidebarWidth(n);
-      return `leftSidebarWidth set to: ${n}`;
-    }
-    case "chatWidth": {
-      const n = parseNumber(value);
-      if (n === null) return `Invalid number: ${value}`;
-      store.setChatWidth(n);
-      return `chatWidth set to: ${n}`;
-    }
-    case "filePanelOpen": {
-      const open = parseBool(value);
-      if (open === null) return `Invalid boolean: ${value}`;
-      if (open !== config.filePanelOpen) store.toggleFilePanel();
-      return `filePanelOpen set to: ${open}`;
-    }
-    case "fileTreeWidth": {
-      const n = parseNumber(value);
-      if (n === null) return `Invalid number: ${value}`;
-      store.setFileTreeWidth(n);
-      return `fileTreeWidth set to: ${n}`;
-    }
-    case "filePreviewWidth": {
-      const n = parseNumber(value);
-      if (n === null) return `Invalid number: ${value}`;
-      store.setFilePreviewWidth(n);
-      return `filePreviewWidth set to: ${n}`;
-    }
-    case "fileTreeShowHidden": {
-      const show = parseBool(value);
-      if (show === null) return `Invalid boolean: ${value}`;
-      store.setFileTreeShowHidden(show);
-      return `fileTreeShowHidden set to: ${show}`;
-    }
-    default:
-      return `Unknown layout key: ${key}`;
+  const numericSetters: Record<string, (n: number) => void> = {
+    leftSidebarWidth: (n) => store.setLeftSidebarWidth(n),
+    chatWidth: (n) => store.setChatWidth(n),
+    fileTreeWidth: (n) => store.setFileTreeWidth(n),
+    filePreviewWidth: (n) => store.setFilePreviewWidth(n),
+  };
+  if (key in numericSetters) {
+    const n = parseNumber(value);
+    if (n === null) return `Invalid number: ${value}`;
+    numericSetters[key]!(n);
+    return `${key} set to: ${n}`;
   }
+
+  if (key === "leftSidebarOpen" || key === "filePanelOpen") {
+    const open = parseBool(value);
+    if (open === null) return `Invalid boolean: ${value}`;
+    if (key === "leftSidebarOpen" && open !== config.leftSidebarOpen) store.toggleLeftSidebar();
+    if (key === "filePanelOpen" && open !== config.filePanelOpen) store.toggleFilePanel();
+    return `${key} set to: ${open}`;
+  }
+  if (key === "fileTreeShowHidden") {
+    const show = parseBool(value);
+    if (show === null) return `Invalid boolean: ${value}`;
+    store.setFileTreeShowHidden(show);
+    return `fileTreeShowHidden set to: ${show}`;
+  }
+  return `Unknown layout key: ${key}`;
 }
 
 async function handleGeneral(input: SettingsInput): Promise<string> {
@@ -373,6 +355,19 @@ async function setAssistantKey(
     return `${key} set to: ${b}`;
   }
 
+  if (key === "trust_mode") {
+    const b = parseBool(value);
+    if (b === null) return `Invalid boolean: ${value}`;
+    const conversationId = useDataStore.getState().activeConversationId;
+    if (!conversationId) return "No active conversation to set trust mode on.";
+    if (b) {
+      usePermissionStore.getState().enableTrustMode(conversationId);
+    } else {
+      usePermissionStore.getState().disableTrustMode(conversationId);
+    }
+    return `trust_mode ${b ? "enabled" : "disabled"} for current conversation.`;
+  }
+
   if (key === "name" || key === "model" || key === "system_instruction") {
     await assistantRepo.update(id, { [key]: value });
     await useDataStore.getState().loadAssistants();
@@ -382,19 +377,15 @@ async function setAssistantKey(
   return `Unknown or read-only key: ${key}`;
 }
 
+const TRUTHY = new Set(["true", "1", "yes", "on"]);
+const FALSY = new Set(["false", "0", "no", "off"]);
 function parseBool(value: string): boolean | null {
   const v = value.toLowerCase();
-  if (v === "true" || v === "1" || v === "yes" || v === "on") return true;
-  if (v === "false" || v === "0" || v === "no" || v === "off") return false;
-  return null;
+  return TRUTHY.has(v) ? true : FALSY.has(v) ? false : null;
 }
 
-function parseNumber(value: string): number | null {
-  const n = Number(value);
-  return isNaN(n) ? null : n;
-}
+function parseNumber(v: string): number | null { const n = Number(v); return isNaN(n) ? null : n; }
 
-function maskApiKey(key: string | undefined): string {
-  if (!key) return "(not set)";
-  return key.length <= 8 ? "****" : `${key.slice(0, 4)}...${key.slice(-4)}`;
+function maskApiKey(k: string | undefined): string {
+  return !k ? "(not set)" : k.length <= 8 ? "****" : `${k.slice(0, 4)}...${k.slice(-4)}`;
 }
