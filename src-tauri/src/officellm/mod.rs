@@ -101,7 +101,10 @@ pub async fn officellm_doctor(app: tauri::AppHandle) -> Result<CommandResult, St
 /// 此命令完成后再执行二进制文件，避免 Gatekeeper 并发验证导致 EACCES。
 #[tauri::command]
 pub async fn officellm_init(app: tauri::AppHandle) -> Result<(), String> {
-    init::mark_init_started();
+    if !init::mark_init_started() {
+        init::wait_for_init();
+        return Ok(());
+    }
     let result = async {
         let (bin, _) = resolve::resolve_bin()
             .ok_or("officellm binary not found")?;

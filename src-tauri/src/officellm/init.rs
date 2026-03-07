@@ -28,12 +28,18 @@ static INIT_STATE: (Mutex<InitState>, Condvar) =
 /// Maximum time to wait for init to complete before proceeding anyway.
 const INIT_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Mark init as in-progress. Called at the start of `officellm_init`.
-pub(crate) fn mark_init_started() {
+/// Try to claim the init slot. Returns `true` if this caller should run
+/// init (first to transition `NotStarted → InProgress`). Returns `false`
+/// if init is already in progress or done — caller should `wait_for_init`.
+pub(crate) fn mark_init_started() -> bool {
     let (lock, _) = &INIT_STATE;
     if let Ok(mut state) = lock.lock() {
-        *state = InitState::InProgress;
+        if *state == InitState::NotStarted {
+            *state = InitState::InProgress;
+            return true;
+        }
     }
+    false
 }
 
 /// Mark init as done and wake all waiters. Called after `officellm_init`
@@ -135,7 +141,7 @@ mod tests {
     fn wait_blocks_until_done() {
         let _g = BARRIER_LOCK.lock().unwrap();
         reset_init_state();
-        mark_init_started();
+        assert!(mark_init_started());
         let handle = std::thread::spawn(|| {
             let start = std::time::Instant::now();
             wait_for_init();
@@ -146,6 +152,16 @@ mod tests {
         let elapsed = handle.join().unwrap();
         assert!(elapsed >= Duration::from_millis(80));
         assert!(elapsed < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn mark_init_started_is_single_flight() {
+        let _g = BARRIER_LOCK.lock().unwrap();
+        reset_init_state();
+        assert!(mark_init_started(), "first call claims the slot");
+        assert!(!mark_init_started(), "second call is rejected");
+        mark_init_done();
+        assert!(!mark_init_started(), "after Done, still rejected");
     }
 
     #[cfg(unix)]
