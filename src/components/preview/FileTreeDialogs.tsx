@@ -17,35 +17,34 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { DeleteTarget } from "@/hooks/useFileTreeDialogs";
+import type { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 
 interface FileTreeDialogsProps {
-  deleteTarget: DeleteTarget | null;
-  setDeleteTarget: (target: DeleteTarget | null) => void;
-  handleConfirmDelete: () => void;
-  newFolderParentPath: string | null;
-  newFolderName: string;
-  setNewFolderName: (name: string) => void;
-  newFolderError: string | null;
-  setNewFolderError: (error: string | null) => void;
-  handleNewFolderConfirm: () => void;
-  handleNewFolderCancel: () => void;
+  dialogs: ReturnType<typeof useFileTreeDialogs>;
   t: (key: string, options?: Record<string, string>) => string;
 }
 
-export function FileTreeDialogs({
-  deleteTarget,
-  setDeleteTarget,
-  handleConfirmDelete,
-  newFolderParentPath,
-  newFolderName,
-  setNewFolderName,
-  newFolderError,
-  setNewFolderError,
-  handleNewFolderConfirm,
-  handleNewFolderCancel,
-  t,
-}: FileTreeDialogsProps) {
+export function FileTreeDialogs({ dialogs, t }: FileTreeDialogsProps) {
+  const {
+    deleteTarget,
+    setDeleteTarget,
+    handleConfirmDelete,
+    newFolderParentPath,
+    newFolderName,
+    setNewFolderName,
+    newFolderError,
+    setNewFolderError,
+    handleNewFolderConfirm,
+    handleNewFolderCancel,
+    newFileParentPath,
+    newFileName,
+    setNewFileName,
+    newFileError,
+    setNewFileError,
+    handleNewFileConfirm,
+    handleNewFileCancel,
+  } = dialogs;
+
   return (
     <>
       <AlertDialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}>
@@ -91,6 +90,38 @@ export function FileTreeDialogs({
               {t("workspace.cancel")}
             </Button>
             <Button variant="brand" className="rounded" onClick={handleNewFolderConfirm} disabled={!newFolderName.trim()}>
+              {t("explorer.create")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={newFileParentPath !== null} onOpenChange={(open) => { if (!open) handleNewFileCancel(); }}>
+        <DialogContent className="sm:max-w-xs rounded" hideOverlay>
+          <DialogHeader>
+            <DialogTitle>{t("explorer.newFile")}</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newFileName}
+            onChange={(e) => {
+              setNewFileName(e.target.value);
+              setNewFileError(null);
+            }}
+            placeholder={t("explorer.newFile")}
+            className="rounded shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleNewFileConfirm();
+              if (e.key === "Escape") handleNewFileCancel();
+            }}
+          />
+          {newFileError && (
+            <p className="text-[12px] -mt-2 -mb-2 text-destructive">{newFileError}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" className="rounded" onClick={handleNewFileCancel}>
+              {t("workspace.cancel")}
+            </Button>
+            <Button variant="brand" className="rounded" onClick={handleNewFileConfirm} disabled={!newFileName.trim()}>
               {t("explorer.create")}
             </Button>
           </DialogFooter>
