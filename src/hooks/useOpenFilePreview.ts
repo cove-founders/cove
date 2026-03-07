@@ -6,14 +6,15 @@ import { useLayoutStore } from "@/stores/layoutStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { getPreviewKind } from "@/lib/preview-types";
 
-/** Resolve a possibly-relative path to absolute using the active workspace root */
-function resolveAbsolute(path: string, workspaceRoot: string | null): string {
-  if (path.startsWith("/")) return path;
-  if (!workspaceRoot) return path;
-  const root = workspaceRoot.endsWith("/") ? workspaceRoot : workspaceRoot + "/";
-  return root + path;
-}
-
+/**
+ * Shared hook for opening file preview panel or system default app.
+ *
+ * Relative paths are kept relative and routed through workspace-gated Tauri
+ * commands (read_file_raw, open_with_app) which enforce ensure_inside_workspace
+ * on the Rust side. Only already-absolute paths (e.g. from attachments) bypass
+ * the workspace gate — this matches the existing behavior in usePreviewContent
+ * and useOpenExternally.
+ */
 export function useOpenFilePreview() {
   const setSelected = useFilePreviewStore((s) => s.setSelected);
   const setFilePanelOpen = useLayoutStore((s) => s.setFilePanelOpen);
@@ -21,21 +22,21 @@ export function useOpenFilePreview() {
 
   const openPreview = useCallback(
     (path: string) => {
-      const resolved = resolveAbsolute(path, workspaceRoot);
-      setSelected(resolved);
+      setSelected(path);
       if (!useLayoutStore.getState().filePanelOpen) {
         setFilePanelOpen(true);
       }
     },
-    [setSelected, setFilePanelOpen, workspaceRoot],
+    [setSelected, setFilePanelOpen],
   );
 
   const openExternal = useCallback(
     (path: string) => {
-      const resolved = resolveAbsolute(path, workspaceRoot);
-      if (resolved.startsWith("/")) {
-        openPath(resolved).catch((e) => console.error("openPath failed:", e));
+      if (path.startsWith("/")) {
+        // Already absolute — open directly (same as useOpenExternally)
+        openPath(path).catch((e) => console.error("openPath failed:", e));
       } else if (workspaceRoot) {
+        // Relative — route through Rust workspace gate
         invoke("open_with_app", {
           args: { workspaceRoot, path, openWith: null },
         }).catch((e) => console.error("open_with_app failed:", e));

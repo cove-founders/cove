@@ -54,14 +54,14 @@ describe("useOpenFilePreview", () => {
       expect(useLayoutStore.getState().filePanelOpen).toBe(true);
     });
 
-    it("resolves relative path against workspace root", () => {
+    it("keeps relative path as-is for workspace-gated preview loading", () => {
       setWorkspaceRoot("/workspace/root");
       useLayoutStore.setState({ filePanelOpen: false });
       const { result } = renderHook(() => useOpenFilePreview());
 
       act(() => result.current.openPreview("src/main.ts"));
 
-      expect(useFilePreviewStore.getState().selectedPath).toBe("/workspace/root/src/main.ts");
+      expect(useFilePreviewStore.getState().selectedPath).toBe("src/main.ts");
     });
 
     it("does not toggle filePanelOpen when panel is already open", () => {
@@ -85,14 +85,16 @@ describe("useOpenFilePreview", () => {
       expect(invoke).not.toHaveBeenCalled();
     });
 
-    it("calls openPath with resolved absolute path for relative path with workspace root", async () => {
+    it("calls invoke open_with_app for relative path with workspace root", async () => {
       setWorkspaceRoot("/workspace/root");
       const { result } = renderHook(() => useOpenFilePreview());
 
       await act(() => result.current.openExternal("docs/report.exe"));
 
-      expect(openPath).toHaveBeenCalledWith("/workspace/root/docs/report.exe");
-      expect(invoke).not.toHaveBeenCalled();
+      expect(invoke).toHaveBeenCalledWith("open_with_app", {
+        args: { workspaceRoot: "/workspace/root", path: "docs/report.exe", openWith: null },
+      });
+      expect(openPath).not.toHaveBeenCalled();
     });
 
     it("does nothing for relative path with no workspace root", async () => {
