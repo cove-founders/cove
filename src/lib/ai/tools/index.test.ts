@@ -5,7 +5,7 @@ vi.mock("./read", () => ({ readTool: { _id: "read" } }));
 vi.mock("./parse-document", () => ({ parseDocumentTool: { _id: "parse_document" } }));
 vi.mock("./write", () => ({ writeTool: { _id: "write" } }));
 vi.mock("./edit", () => ({ editTool: { _id: "edit" } }));
-vi.mock("./bash", () => ({ bashTool: { _id: "bash" } }));
+vi.mock("./bash", () => ({ createBashTool: vi.fn(() => ({ _id: "bash" })) }));
 vi.mock("./fetch-url", () => ({ fetchUrlTool: { _id: "fetch_url" } }));
 vi.mock("./office", () => ({ officeTool: { _id: "office" } }));
 vi.mock("./jsInterpreter", () => ({ jsInterpreterTool: { _id: "cove_interpreter" } }));
