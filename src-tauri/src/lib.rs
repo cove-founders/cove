@@ -123,6 +123,7 @@ pub fn run() {
       cookie_commands::get_browser_cookies,
       fetch_commands::fetch_url,
       render_commands::render_url,
+      render_commands::render_extract_content,
       fs_commands::read_file,
       fs_commands::read_file_raw,
       fs_commands::write_file,

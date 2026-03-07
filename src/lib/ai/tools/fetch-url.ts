@@ -17,6 +17,15 @@ interface RenderUrlResult {
   source: string;
 }
 
+interface RenderContentResult {
+  ok: boolean;
+  title?: string;
+  content_md?: string;
+  truncated?: boolean;
+  error?: string;
+  source: string;
+}
+
 function formatCookieHeader(pairs: CookiePair[]): string {
   return pairs.map((p) => `${p.name}=${p.value}`).join("; ");
 }
@@ -90,7 +99,17 @@ export const fetchUrlTool = tool({
         args: { url, timeoutMs, maxChars, cookies },
       });
 
-      // Cookie retry takes priority: suggest retry before returning low-quality content
+      // Good content from HTTP — return directly
+      if (res.ok && res.content_md && !res.low_quality) {
+        const title = res.title ? `[${res.title}](${res.source})` : res.source;
+        return `## ${title}\n\n${res.content_md}`;
+      }
+
+      // HTTP returned no/low-quality content — try Chrome rendering first
+      const chromeResult = await chromeFallback(url);
+      if (chromeResult) return chromeResult;
+
+      // Chrome also failed — suggest cookie retry if applicable
       if (res.retry_with_cookies && !useCookies) {
         const context = res.ok
           ? `${res.source} returned low-quality content (possibly anti-bot protection).`
@@ -104,11 +123,6 @@ export const fetchUrlTool = tool({
         );
       }
 
-      if (res.ok && res.content_md) {
-        const title = res.title ? `[${res.title}](${res.source})` : res.source;
-        return `## ${title}\n\n${res.content_md}`;
-      }
-
       return res.error
         ? `${res.source} fetch failed: ${res.error}`
         : `${res.source} returned no readable content`;
@@ -118,6 +132,21 @@ export const fetchUrlTool = tool({
     }
   },
 });
+
+async function chromeFallback(url: string): Promise<string | null> {
+  try {
+    const rendered = await invoke<RenderContentResult>("render_extract_content", {
+      args: { url },
+    });
+    if (rendered.ok && rendered.content_md) {
+      const title = rendered.title ? `[${rendered.title}](${rendered.source})` : rendered.source;
+      return `## ${title}\n\n${rendered.content_md}`;
+    }
+  } catch {
+    // Chrome not available
+  }
+  return null;
+}
 
 async function handleSaveAsMarkdown(
   url: string,

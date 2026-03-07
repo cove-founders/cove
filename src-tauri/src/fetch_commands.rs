@@ -82,6 +82,11 @@ fn strip_noise_tags(html: &str) -> String {
     result
 }
 
+/// Strip noise tags from HTML and convert to Markdown.
+pub fn html_to_clean_md(html: &str) -> String {
+    parse_html(&strip_noise_tags(html))
+}
+
 fn browser_headers() -> HeaderMap {
     let mut h = HeaderMap::new();
     h.insert(USER_AGENT, CHROME_UA.parse().unwrap());

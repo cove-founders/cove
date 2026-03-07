@@ -21,15 +21,13 @@ fn browser_lock() -> &'static Mutex<Option<Arc<Browser>>> {
     BROWSER.get_or_init(|| Mutex::new(None))
 }
 
-async fn get_or_launch_browser(
+pub(crate) async fn get_or_launch_browser(
     width: u32,
     height: u32,
 ) -> Result<Arc<Browser>, String> {
     let mut guard = browser_lock().lock().await;
 
-    // Reuse existing browser if still alive
     if let Some(ref browser) = *guard {
-        // Quick health check
         match browser.new_page("about:blank").await {
             Ok(page) => {
                 let page: Page = page;
@@ -42,16 +40,12 @@ async fn get_or_launch_browser(
         }
     }
 
-    // Use a unique user-data-dir to avoid SingletonLock conflicts
-    // with other Chrome instances (including user's regular Chrome).
-    // Clean up all Singleton* files before launch — a previous browser
-    // may have crashed and left them behind.
     let user_data_dir = std::env::temp_dir().join("cove-chrome-render");
     for name in ["SingletonLock", "SingletonSocket", "SingletonCookie"] {
         let _ = std::fs::remove_file(user_data_dir.join(name));
     }
 
-    let config = BrowserConfig::builder()
+    let mut builder = BrowserConfig::builder()
         .window_size(width, height)
         .no_sandbox()
         .user_data_dir(user_data_dir)
@@ -61,7 +55,14 @@ async fn get_or_launch_browser(
         .arg("disable-default-apps")
         .arg("disable-sync")
         .arg("disable-lazy-loading")
-        .arg("mute-audio")
+        .arg("mute-audio");
+
+    if let Some(proxy) = super::proxy::detect_proxy() {
+        log::info!("[render] using proxy: {proxy}");
+        builder = builder.arg(format!("proxy-server={proxy}"));
+    }
+
+    let config = builder
         .build()
         .map_err(|e| format!("Failed to build browser config: {e}"))?;
 
@@ -69,7 +70,6 @@ async fn get_or_launch_browser(
         .await
         .map_err(|e| format!("Failed to launch Chrome: {e}"))?;
 
-    // Spawn the CDP event handler loop
     tokio::spawn(async move {
         while let Some(_event) = handler.next().await {}
     });
@@ -98,14 +98,11 @@ pub async fn render(
         Err(e) => return RenderUrlResult::err(url, e),
     };
 
-    // Create a blank page first so we can set up event listeners
-    // BEFORE navigation starts.
     let page: Page = match browser.new_page("about:blank").await {
         Ok(p) => p,
         Err(e) => return RenderUrlResult::err(url, format!("Failed to open page: {e}")),
     };
 
-    // Enable lifecycle events and subscribe BEFORE navigating
     let _ = page
         .execute(SetLifecycleEventsEnabledParams::new(true))
         .await;
@@ -113,7 +110,6 @@ pub async fn render(
         Ok(l) => l,
         Err(e) => {
             log::warn!("[render] failed to create lifecycle listener: {e}");
-            // Fallback: navigate without networkIdle wait
             if let Err(e) = page.goto(url).await {
                 return RenderUrlResult::err(url, format!("Failed to navigate: {e}"));
             }
@@ -122,13 +118,10 @@ pub async fn render(
         }
     };
 
-    // Navigate
     if let Err(e) = page.goto(url).await {
         return RenderUrlResult::err(url, format!("Failed to navigate: {e}"));
     }
 
-    // Wait for networkIdle lifecycle event (all resources loaded, network
-    // quiet for 500ms). Timeout after 15s.
     let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
     loop {
         match tokio::time::timeout_at(deadline, lifecycle.next()).await {
@@ -141,9 +134,7 @@ pub async fn render(
         }
     }
 
-    // Short settle for final paints / font rendering
     sleep(Duration::from_millis(500)).await;
-
     capture_and_close(&page, url, screenshot, pdf).await
 }
 

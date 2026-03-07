@@ -1,4 +1,6 @@
-mod chrome;
+pub(crate) mod chrome;
+mod content;
+pub(crate) mod proxy;
 #[cfg(test)]
 mod tests;
 
@@ -43,6 +45,29 @@ impl RenderUrlResult {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct RenderContentResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_md: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    pub source: String,
+}
+
+impl RenderContentResult {
+    pub(crate) fn err(url: &str, msg: String) -> Self {
+        Self {
+            ok: false, title: None, content_md: None, truncated: None,
+            error: Some(msg), source: url.to_string(),
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn render_url(args: RenderUrlArgs) -> Result<RenderUrlResult, String> {
     let url = args.url.clone();
@@ -68,5 +93,24 @@ pub async fn render_url(args: RenderUrlArgs) -> Result<RenderUrlResult, String> 
     {
         Ok(result) => Ok(result),
         Err(_) => Ok(RenderUrlResult::err(&url, "Chrome render timed out".into())),
+    }
+}
+
+#[tauri::command]
+pub async fn render_extract_content(args: RenderUrlArgs) -> Result<RenderContentResult, String> {
+    let url = args.url.clone();
+    let timeout = args.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS);
+    let width = args.window_width.unwrap_or(DEFAULT_WIDTH);
+    let height = args.window_height.unwrap_or(DEFAULT_HEIGHT);
+    let max_chars: u32 = 120_000;
+
+    match tokio::time::timeout(
+        std::time::Duration::from_millis(timeout),
+        content::extract_content(&url, width, height, max_chars),
+    )
+    .await
+    {
+        Ok(result) => Ok(result),
+        Err(_) => Ok(RenderContentResult::err(&url, "Chrome extract timed out".into())),
     }
 }
