@@ -16,23 +16,15 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  Eye,
-  EyeOff,
-  RefreshCw,
-  FolderPlus,
-  Search,
-  Clipboard,
-} from "lucide-react";
+import { ChevronsDownUp, Eye, EyeOff, FilePlus, RefreshCw, FolderPlus, Search, Clipboard } from "lucide-react";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
 import { useFileTreeSearch } from "@/hooks/useFileTreeSearch";
 import { useFileClipboard } from "@/hooks/useFileClipboard";
-import { FileTreeItem } from "./FileTreeItem";
+import { FileTreeItem, type ListDirEntry } from "./FileTreeItem";
 import { FileTreeDialogs } from "./FileTreeDialogs";
 import { FileTreeSearch } from "./FileTreeSearch";
-import type { ListDirEntry } from "./FileTreeItem";
 
 async function listDir(
   workspaceRoot: string,
@@ -308,6 +300,14 @@ export function FileTreePanel() {
         <div className="flex items-center gap-0.5">
           <button
             type="button"
+            onClick={() => setExpandedDirs(new Set())}
+            className="rounded p-1.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
+            title={t("preview.collapseAll")}
+          >
+            <ChevronsDownUp className="size-3.5" strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
             onClick={search.openSearch}
             className="rounded p-1.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
             title={t("preview.searchFiles")}
@@ -371,6 +371,7 @@ export function FileTreePanel() {
                     onToggleExpand={onToggleExpand}
                     onSelectFile={setSelected}
                     onLoadChildren={onLoadChildren}
+                    onNewFile={dialogs.onNewFile}
                     onNewFolder={dialogs.onNewFolder}
                     onCopy={clipboard.onCopy}
                     onCut={clipboard.onCut}
@@ -395,6 +396,10 @@ export function FileTreePanel() {
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className="w-48 rounded-lg border border-border shadow-lg">
+            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => dialogs.onNewFile("")}>
+              <FilePlus className="size-4" strokeWidth={1.5} />
+              {t("explorer.newFile")}
+            </ContextMenuItem>
             <ContextMenuItem className="gap-2 text-[13px]" onClick={() => dialogs.onNewFolder("")}>
               <FolderPlus className="size-4" strokeWidth={1.5} />
               {t("explorer.newFolder")}
@@ -409,19 +414,7 @@ export function FileTreePanel() {
         </ContextMenu>
       </ScrollArea>
 
-      <FileTreeDialogs
-        deleteTarget={dialogs.deleteTarget}
-        setDeleteTarget={dialogs.setDeleteTarget}
-        handleConfirmDelete={dialogs.handleConfirmDelete}
-        newFolderParentPath={dialogs.newFolderParentPath}
-        newFolderName={dialogs.newFolderName}
-        setNewFolderName={dialogs.setNewFolderName}
-        newFolderError={dialogs.newFolderError}
-        setNewFolderError={dialogs.setNewFolderError}
-        handleNewFolderConfirm={dialogs.handleNewFolderConfirm}
-        handleNewFolderCancel={dialogs.handleNewFolderCancel}
-        t={t}
-      />
+      <FileTreeDialogs dialogs={dialogs} t={t} />
     </div>
   );
 }

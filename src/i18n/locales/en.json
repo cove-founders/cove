@@ -103,7 +103,10 @@
     "delete": "Delete",
     "deleteConfirmTitle": "Delete",
     "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This cannot be undone.",
-    "folderAlreadyExists": "A folder with this name already exists."
+    "folderAlreadyExists": "A folder with this name already exists.",
+    "newFile": "New File",
+    "fileAlreadyExists": "A file with this name already exists.",
+    "invalidFileName": "Invalid file name."
   },
   "preview": {
     "openFilePanel": "Open file panel",
@@ -131,6 +134,7 @@
     "pageNumber": "Page {{current}} / {{total}}",
     "searchPlaceholder": "Filter files\u2026",
     "searchFiles": "Search files",
+    "collapseAll": "Collapse all",
     "csvRows": "rows",
     "csvCols": "columns",
     "csvTruncated": "showing {{rows}} rows x {{cols}} columns"

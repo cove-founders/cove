@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Folder,
   FolderOpen,
+  FilePlus,
   FolderPlus,
   Pencil,
   FileUp,
@@ -44,6 +45,7 @@ export function FileTreeItem({
   onToggleExpand,
   onSelectFile,
   onLoadChildren,
+  onNewFile,
   onNewFolder,
   onCopy,
   onCut,
@@ -75,6 +77,7 @@ export function FileTreeItem({
   onToggleExpand: (path: string) => void;
   onSelectFile: (path: string) => void;
   onLoadChildren: (path: string, entries: ListDirEntry[]) => void;
+  onNewFile: (parentPath: string) => void;
   onNewFolder: (parentPath: string) => void;
   onCopy?: (path: string) => void;
   onCut?: (path: string) => void;
@@ -226,6 +229,10 @@ export function FileTreeItem({
           </button>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48 rounded-lg border border-border shadow-lg">
+          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onNewFile(isDir ? path : parentPath)}>
+            <FilePlus className="size-4" strokeWidth={1.5} />
+            {t("explorer.newFile")}
+          </ContextMenuItem>
           <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onNewFolder(isDir ? path : parentPath)}>
             <FolderPlus className="size-4" strokeWidth={1.5} />
             {t("explorer.newFolder")}
@@ -291,6 +298,7 @@ export function FileTreeItem({
               onToggleExpand={onToggleExpand}
               onSelectFile={onSelectFile}
               onLoadChildren={onLoadChildren}
+              onNewFile={onNewFile}
               onNewFolder={onNewFolder}
               onCopy={onCopy}
               onCut={onCut}

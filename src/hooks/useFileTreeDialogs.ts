@@ -28,6 +28,9 @@ export function useFileTreeDialogs({
   const [newFolderParentPath, setNewFolderParentPath] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
   const [newFolderError, setNewFolderError] = useState<string | null>(null);
+  const [newFileParentPath, setNewFileParentPath] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState("");
+  const [newFileError, setNewFileError] = useState<string | null>(null);
 
   const onDelete = useCallback(
     (path: string, name: string) => setDeleteTarget({ path, name }),
@@ -78,6 +81,47 @@ export function useFileTreeDialogs({
     setNewFolderError(null);
   }, []);
 
+  const onNewFile = useCallback((parentPath: string) => {
+    setNewFileParentPath(parentPath);
+    setNewFileName("");
+    setNewFileError(null);
+  }, []);
+
+  const handleNewFileConfirm = useCallback(() => {
+    const name = newFileName.trim();
+    if (!name || !workspaceRoot || newFileParentPath === null) return;
+    if (name.includes("/") || name.includes("\\")) {
+      setNewFileError(t("explorer.invalidFileName"));
+      return;
+    }
+    setNewFileError(null);
+    const parentPath = newFileParentPath;
+    const fullPath = parentPath ? `${parentPath}/${name}` : name;
+    invoke("create_new_file", { args: { workspaceRoot, path: fullPath } })
+      .then(() => {
+        setNewFileParentPath(null);
+        setNewFileName("");
+        setNewFileError(null);
+        if (parentPath) {
+          setExpandedDirs((prev) => new Set([...prev, parentPath]));
+        }
+      })
+      .catch((err: unknown) => {
+        const msg =
+          typeof err === "object" && err != null && "message" in err
+            ? String((err as { message: string }).message)
+            : String(err);
+        const isAlreadyExists = /already exists|已存在/i.test(msg);
+        setNewFileError(isAlreadyExists ? t("explorer.fileAlreadyExists") : msg);
+      });
+  }, [workspaceRoot, newFileParentPath, newFileName, t, setExpandedDirs]);
+
+  const handleNewFileCancel = useCallback(() => {
+    setNewFileParentPath(null);
+    setNewFileName("");
+    setNewFileError(null);
+  }, []);
+
   return {
     deleteTarget,
     setDeleteTarget,
@@ -91,5 +135,13 @@ export function useFileTreeDialogs({
     onNewFolder,
     handleNewFolderConfirm,
     handleNewFolderCancel,
+    newFileParentPath,
+    newFileName,
+    setNewFileName,
+    newFileError,
+    setNewFileError,
+    onNewFile,
+    handleNewFileConfirm,
+    handleNewFileCancel,
   };
 }
