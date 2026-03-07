@@ -8,6 +8,7 @@ mod fetch_commands;
 mod fs_commands;
 mod js_interpreter;
 mod officellm;
+mod render_commands;
 mod sandbox;
 mod sidecar;
 mod shell_commands;
@@ -121,6 +122,8 @@ pub fn run() {
       clipboard_commands::read_clipboard_files,
       cookie_commands::get_browser_cookies,
       fetch_commands::fetch_url,
+      render_commands::render_url,
+      render_commands::render_extract_content,
       fs_commands::read_file,
       fs_commands::read_file_raw,
       fs_commands::write_file,

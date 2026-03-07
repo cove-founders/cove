@@ -46,10 +46,7 @@ const mockStreamStore = {
 vi.mock("./streamStore", () => ({ useStreamStore: { getState: () => mockStreamStore } }));
 
 vi.mock("./chat-stream-runner", () => ({ runStreamLoop: vi.fn() }));
-vi.mock("./chat-url-utils", () => ({
-  getFetchBlockForText: vi.fn().mockResolvedValue(""),
-  injectFetchBlockIntoLastUserMessage: vi.fn(),
-}));
+vi.mock("./chat-url-utils", () => ({}));
 vi.mock("@/lib/ai/model-service", () => ({ getModelOption: vi.fn().mockReturnValue(null) }));
 vi.mock("@/lib/ai/agent", () => ({
   toModelMessages: vi.fn().mockReturnValue([{ role: "user", content: [{ type: "text", text: "hello" }] }]),
@@ -75,7 +72,7 @@ import { attachmentRepo } from "@/db/repos/attachmentRepo";
 import { conversationRepo } from "@/db/repos/conversationRepo";
 import { providerRepo } from "@/db/repos/providerRepo";
 import { runStreamLoop } from "./chat-stream-runner";
-import { getFetchBlockForText, injectFetchBlockIntoLastUserMessage } from "./chat-url-utils";
+
 import { getModelOption } from "@/lib/ai/model-service";
 import { toModelMessages } from "@/lib/ai/agent";
 import { reportAgentRunMetrics } from "@/lib/ai/agent-metrics";
@@ -287,28 +284,6 @@ describe("chatStore — sendMessage", () => {
         | undefined;
       expect(textPart?.text).toContain("read");
       expect(runStreamLoop).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("url fetch", () => {
-    it("injects fetchBlock when no attachments", async () => {
-      setupDefaultMocks();
-      vi.mocked(getFetchBlockForText).mockResolvedValue("<fetched>");
-      await useChatStore.getState().sendMessage("hello");
-      expect(injectFetchBlockIntoLastUserMessage).toHaveBeenCalledWith(expect.anything(), "<fetched>");
-    });
-
-    it("includes fetchBlock in text when attachments present", async () => {
-      setupDefaultMocks();
-      const msgs = [{ role: "user", content: [{ type: "text", text: "hello" }] }];
-      vi.mocked(toModelMessages).mockReturnValue(msgs as ReturnType<typeof toModelMessages>);
-      const draft: DraftAttachment = { id: "a1", type: "file", name: "f.txt" };
-      setStoreState(useChatStore, { ...useChatStore.getState(), draftAttachments: [draft] });
-      vi.mocked(getFetchBlockForText).mockResolvedValue("<fetched>");
-
-      await useChatStore.getState().sendMessage("hello");
-      // When attachments present, fetchBlock is appended to userText, not via injectFetchBlock
-      expect(injectFetchBlockIntoLastUserMessage).not.toHaveBeenCalled();
     });
   });
 

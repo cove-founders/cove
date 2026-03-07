@@ -16,7 +16,7 @@ import { createAgentRunMetrics, reportAgentRunMetrics } from "@/lib/ai/agent-met
 import { generateConversationTitleFromUserQuestion } from "@/lib/ai/generate-title";
 import { conversationRepo } from "@/db/repos/conversationRepo";
 import { useWorkspaceStore } from "./workspaceStore";
-import { getFetchBlockForText, injectFetchBlockIntoLastUserMessage } from "./chat-url-utils";
+
 import { LAST_MODEL_KEY } from "./chat-retry-utils";
 import { runStreamLoop } from "./chat-stream-runner";
 import type { ToolCallInfo, DraftAttachment, MessagePart } from "./chat-types";
@@ -204,15 +204,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       updatedMessages = compressed.messages;
 
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
-      const fetchBlock = await getFetchBlockForText(trimmedContent);
+      const modelSupportsVision = modelOption?.vision === true || modelOption?.image_in === true;
 
       if (readyAttachments.length > 0) {
         const latestUserIndex = [...modelMessages].reverse().findIndex((m) => m.role === "user");
         if (latestUserIndex >= 0) {
           const index = modelMessages.length - 1 - latestUserIndex;
-          const modelSupportsVision = modelOption?.vision === true || modelOption?.image_in === true;
           const injection = buildAttachmentInjection(readyAttachments, { modelSupportsVision, modelSupportsPdfNative });
-          const userText = `${trimmedContent}${injection.textBlock}${fetchBlock}`.trim();
+          const userText = `${trimmedContent}${injection.textBlock}`.trim();
           const nextContent: UserContent = [];
           if (userText) nextContent.push({ type: "text", text: userText });
           for (const part of injection.visionParts) nextContent.push(part);
@@ -221,8 +220,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             modelMessages[index] = { role: "user", content: nextContent };
           }
         }
-      } else {
-        injectFetchBlockIntoLastUserMessage(modelMessages, fetchBlock);
       }
 
       const { streamResult, finalError } = await runStreamLoop(
@@ -312,9 +309,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     try {
       const compressed = await tryCompress(remaining, conversationId, provider, modelId, set);
       const modelMessages = toModelMessages(compressed.messages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
-      const last = compressed.messages[compressed.messages.length - 1];
-      const lastUserContent = last?.role === "user" ? (last.content ?? "") : "";
-      injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(lastUserContent));
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `regenerate:${provider.type}/${modelId}` },
@@ -391,7 +385,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set);
       updatedMessages = compressed.messages;
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
-      injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(newContent));
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `edit_resend:${provider.type}/${modelId}` },

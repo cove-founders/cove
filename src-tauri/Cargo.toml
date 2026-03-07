@@ -43,6 +43,9 @@ regex = "1.10"
 notify = "6.1"
 rquickjs = { version = "0.11", features = ["bindgen", "parallel"] }
 ignore = "0.4"
+chromiumoxide = "0.9"
+futures = "0.3"
+tokio = { version = "1", features = ["sync", "time", "macros"] }
 
 [dev-dependencies]
 tempfile = "3"

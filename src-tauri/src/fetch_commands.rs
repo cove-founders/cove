@@ -29,7 +29,6 @@ pub struct FetchUrlArgs {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct FetchUrlResult {
     pub ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,6 +80,11 @@ fn strip_noise_tags(html: &str) -> String {
         result = re.replace_all(&result, "").to_string();
     }
     result
+}
+
+/// Strip noise tags from HTML and convert to Markdown.
+pub fn html_to_clean_md(html: &str) -> String {
+    parse_html(&strip_noise_tags(html))
 }
 
 fn browser_headers() -> HeaderMap {

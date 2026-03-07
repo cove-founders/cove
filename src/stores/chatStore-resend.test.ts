@@ -34,10 +34,7 @@ vi.mock("./dataStore", () => ({
 const mockWorkspaceStore = { activeWorkspace: null, loadFromConversation: vi.fn().mockResolvedValue(undefined) };
 vi.mock("./workspaceStore", () => ({ useWorkspaceStore: { getState: () => mockWorkspaceStore } }));
 vi.mock("./chat-stream-runner", () => ({ runStreamLoop: vi.fn() }));
-vi.mock("./chat-url-utils", () => ({
-  getFetchBlockForText: vi.fn().mockResolvedValue(""),
-  injectFetchBlockIntoLastUserMessage: vi.fn(),
-}));
+vi.mock("./chat-url-utils", () => ({}));
 vi.mock("@/lib/ai/model-service", () => ({ getModelOption: vi.fn().mockReturnValue(null) }));
 vi.mock("@/lib/ai/agent", () => ({ toModelMessages: vi.fn().mockReturnValue([]) }));
 vi.mock("@/lib/ai/agent-metrics", () => ({

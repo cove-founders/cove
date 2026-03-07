@@ -35,7 +35,7 @@ const mockStreamStore = {
 };
 vi.mock("./streamStore", () => ({ useStreamStore: { getState: () => mockStreamStore } }));
 vi.mock("./chat-stream-runner", () => ({ runStreamLoop: vi.fn() }));
-vi.mock("./chat-url-utils", () => ({ getFetchBlockForText: vi.fn().mockResolvedValue(""), injectFetchBlockIntoLastUserMessage: vi.fn() }));
+vi.mock("./chat-url-utils", () => ({}));
 vi.mock("@/lib/ai/model-service", () => ({ getModelOption: vi.fn() }));
 vi.mock("@/lib/ai/agent", () => ({ toModelMessages: vi.fn().mockReturnValue([]) }));
 vi.mock("@/lib/ai/agent-metrics", () => ({ createAgentRunMetrics: vi.fn().mockReturnValue({}), reportAgentRunMetrics: vi.fn() }));
