@@ -54,6 +54,7 @@ pub fn read_clipboard_files() -> Vec<String> {
 fn read_clipboard_files_impl() -> Option<Vec<String>> {
     // JXA script to read NSFilenamesPboardType from NSPasteboard
     let script = r#"
+        ObjC.import("AppKit");
         var pb = $.NSPasteboard.generalPasteboard;
         var arr = pb.propertyListForType($.NSFilenamesPboardType);
         if (!arr || arr.count === 0) { ''; }
