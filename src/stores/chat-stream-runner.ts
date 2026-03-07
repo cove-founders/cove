@@ -25,6 +25,7 @@ export interface StreamRunOptions {
   abortSignal: AbortSignal;
   runMetrics: AgentRunMetrics;
   labelBase: string;
+  conversationId: string;
 }
 
 export interface StreamRunCallbacks {
@@ -47,7 +48,7 @@ export async function runStreamLoop(
   opts: StreamRunOptions,
   callbacks: StreamRunCallbacks,
 ): Promise<StreamRunResult> {
-  const { provider, modelId, modelMessages, workspacePath, abortSignal, runMetrics, labelBase } = opts;
+  const { provider, modelId, modelMessages, workspacePath, abortSignal, runMetrics, labelBase, conversationId } = opts;
   const model = getModel(provider, modelId);
   const modelOption = getModelOption(provider, modelId);
   const enabledSkillNames = await getEnabledSkillNames();
@@ -69,6 +70,7 @@ export async function runStreamLoop(
   // Build base tools first (without spawn_agent) to use as parentTools
   const baseTools = getAgentTools(enabledSkillNames, {
     runtimeAvailability: { office: officeAvailable },
+    conversationId,
   });
   const subAgentContext: SubAgentContext = {
     model,
@@ -82,6 +84,7 @@ export async function runStreamLoop(
   const tools = getAgentTools(enabledSkillNames, {
     runtimeAvailability: { office: officeAvailable },
     subAgentContext,
+    conversationId,
   });
 
   let streamResult: StreamResult | null = null;

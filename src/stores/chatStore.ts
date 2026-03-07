@@ -226,7 +226,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
 
       const { streamResult, finalError } = await runStreamLoop(
-        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `send:${provider.type}/${modelId}` },
+        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `send:${provider.type}/${modelId}` },
         { onUpdate: (s) => useStreamStore.getState().updateStream(conversationId, s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError }); useStreamStore.getState().endStream(conversationId); return; }
@@ -317,7 +317,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(lastUserContent));
 
       const { streamResult, finalError } = await runStreamLoop(
-        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `regenerate:${provider.type}/${modelId}` },
+        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `regenerate:${provider.type}/${modelId}` },
         { onUpdate: (s) => useStreamStore.getState().updateStream(conversationId, s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError }); useStreamStore.getState().endStream(conversationId); return; }
@@ -394,7 +394,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(newContent));
 
       const { streamResult, finalError } = await runStreamLoop(
-        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `edit_resend:${provider.type}/${modelId}` },
+        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `edit_resend:${provider.type}/${modelId}` },
         { onUpdate: (s) => useStreamStore.getState().updateStream(conversationId, s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError }); useStreamStore.getState().endStream(conversationId); return; }
