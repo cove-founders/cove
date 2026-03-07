@@ -29,7 +29,6 @@ pub struct FetchUrlArgs {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct FetchUrlResult {
     pub ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

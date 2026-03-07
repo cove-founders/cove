@@ -2,10 +2,19 @@ import { tool } from "ai";
 import { z } from "zod/v4";
 import { invoke } from "@tauri-apps/api/core";
 import { type FetchUrlResult } from "@/lib/url-utils";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 
 interface CookiePair {
   name: string;
   value: string;
+}
+
+interface RenderUrlResult {
+  ok: boolean;
+  screenshot_base64?: string;
+  pdf_base64?: string;
+  error?: string;
+  source: string;
 }
 
 function formatCookieHeader(pairs: CookiePair[]): string {
@@ -22,7 +31,11 @@ function extractDomain(url: string): string {
 
 export const fetchUrlTool = tool({
   description:
-    "Fetch a URL's content as Markdown. Use when user provides a link but content is not available. " +
+    "Fetch a URL's content as Markdown, or save/export the page as PDF, PNG screenshot, or Markdown file. " +
+    "When user asks to convert/save a webpage as PDF, set saveAsPdf=true. " +
+    "When user asks to convert/save/screenshot a webpage as PNG/image, set saveAsPng=true. " +
+    "When user asks to save/export a webpage as Markdown (.md file), set saveAsMarkdown=true. " +
+    "These save the file directly — do NOT manually recreate page content. " +
     "If the site blocks access or returns low-quality content, the result may suggest retrying with browser cookies — " +
     "ask the user for permission before doing so. Does not support YouTube transcripts.",
   inputSchema: z.object({
@@ -33,8 +46,30 @@ export const fetchUrlTool = tool({
       .boolean()
       .optional()
       .describe("Set to true after user grants cookie permission for retry"),
+    saveAsPdf: z
+      .boolean()
+      .optional()
+      .describe("Save the webpage as a PDF file via Chrome headless rendering. Use when user asks to convert/export/save a page as PDF. Requires workspace."),
+    saveAsPng: z
+      .boolean()
+      .optional()
+      .describe("Save a PNG screenshot of the webpage via Chrome headless rendering. Use when user asks to convert/screenshot/save a page as PNG/image. Requires workspace."),
+    saveAsMarkdown: z
+      .boolean()
+      .optional()
+      .describe("Save the webpage content as a Markdown (.md) file. Use when user asks to save/export a page as Markdown. Requires workspace."),
   }),
-  execute: async ({ url, timeoutMs = 30000, maxChars = 120000, useCookies }) => {
+  execute: async ({ url, timeoutMs = 30000, maxChars = 120000, useCookies, saveAsPdf, saveAsPng, saveAsMarkdown }) => {
+    if (saveAsMarkdown) {
+      return handleSaveAsMarkdown(url, timeoutMs, maxChars);
+    }
+    if (saveAsPng) {
+      return handleSaveAsPng(url);
+    }
+    if (saveAsPdf) {
+      return handleSaveAsPdf(url);
+    }
+
     try {
       let cookies: string | undefined;
       if (useCookies) {
@@ -83,3 +118,101 @@ export const fetchUrlTool = tool({
     }
   },
 });
+
+async function handleSaveAsMarkdown(
+  url: string,
+  timeoutMs: number,
+  maxChars: number,
+): Promise<string> {
+  const workspace = useWorkspaceStore.getState().activeWorkspace;
+  if (!workspace?.path) {
+    return "Cannot save Markdown: no active workspace. Please set a workspace first.";
+  }
+
+  try {
+    const res = await invoke<FetchUrlResult>("fetch_url", {
+      args: { url, timeoutMs, maxChars },
+    });
+
+    if (!res.ok || !res.content_md) {
+      return res.error
+        ? `Markdown export failed: ${res.error}`
+        : `${res.source} returned no readable content`;
+    }
+
+    const title = res.title ? `# ${res.title}\n\nSource: ${res.source}\n\n` : "";
+    const content = `${title}${res.content_md}`;
+    const filename = `${new URL(url).hostname.replace(/\./g, "_")}_${Date.now()}.md`;
+    await invoke("write_file", {
+      args: { workspaceRoot: workspace.path, path: filename, content },
+    });
+    const savedPath = `${workspace.path}/${filename}`;
+
+    return `Markdown saved to: ${savedPath}`;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `Markdown export failed: ${msg}`;
+  }
+}
+
+async function handleSaveAsPng(url: string): Promise<string> {
+  const workspace = useWorkspaceStore.getState().activeWorkspace;
+  if (!workspace?.path) {
+    return "Cannot save PNG: no active workspace. Please set a workspace first.";
+  }
+
+  try {
+    const renderResult = await invoke<RenderUrlResult>("render_url", {
+      args: { url, screenshot: true, pdf: false },
+    });
+
+    if (!renderResult.ok || !renderResult.screenshot_base64) {
+      return `PNG export failed: ${renderResult.error ?? "Chrome did not produce a screenshot. Is Chrome installed?"}`;
+    }
+
+    const filename = `${new URL(url).hostname.replace(/\./g, "_")}_${Date.now()}.png`;
+    const savedPath = await invoke<string>("write_binary_file", {
+      args: {
+        workspaceRoot: workspace.path,
+        path: filename,
+        contentBase64: renderResult.screenshot_base64,
+      },
+    });
+
+    return `PNG screenshot saved to: ${savedPath}`;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `PNG export failed: ${msg}`;
+  }
+}
+
+async function handleSaveAsPdf(url: string): Promise<string> {
+  const workspace = useWorkspaceStore.getState().activeWorkspace;
+  if (!workspace?.path) {
+    return "Cannot save PDF: no active workspace. Please set a workspace first.";
+  }
+
+  try {
+    const renderResult = await invoke<RenderUrlResult>("render_url", {
+      args: { url, pdf: true, screenshot: false },
+    });
+
+    if (!renderResult.ok || !renderResult.pdf_base64) {
+      return `PDF export failed: ${renderResult.error ?? "Chrome did not produce a PDF. Is Chrome installed?"}`;
+    }
+
+    const filename = `${new URL(url).hostname.replace(/\./g, "_")}_${Date.now()}.pdf`;
+    const savedPath = await invoke<string>("write_binary_file", {
+      args: {
+        workspaceRoot: workspace.path,
+        path: filename,
+        contentBase64: renderResult.pdf_base64,
+      },
+    });
+
+    return `PDF saved to: ${savedPath}`;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `PDF export failed: ${msg}`;
+  }
+}
