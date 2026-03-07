@@ -1,6 +1,21 @@
 import { useCallback, useMemo } from "react";
 import type { ListDirEntry } from "@/components/preview/FileTreeItem";
 
+/** Check if the event target is an editable element (input, textarea, contenteditable). */
+export function isEditableTarget(e: { target: EventTarget | null }): boolean {
+  const { target } = e;
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement
+  ) {
+    return true;
+  }
+  if (target instanceof HTMLElement && target.isContentEditable) {
+    return true;
+  }
+  return false;
+}
+
 interface UseFileTreeKeyboardParams {
   rootEntries: ListDirEntry[] | null;
   expandedDirs: Set<string>;
@@ -55,6 +70,9 @@ export function useFileTreeKeyboard({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Don't hijack keys when focus is inside an editable element (rename, search, etc.)
+      if (isEditableTarget(e)) return;
+
       // Don't handle if modifier keys are pressed (let existing Cmd+C/X/V work)
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 

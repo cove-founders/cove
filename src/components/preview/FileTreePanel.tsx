@@ -1,6 +1,9 @@
 // FILE_SIZE_EXCEPTION: keyboard navigation integration adds state + hook wiring that cannot be split further
 import { useCallback, useEffect, useState } from "react";
-import { useFileTreeKeyboard } from "@/hooks/useFileTreeKeyboard";
+import {
+  useFileTreeKeyboard,
+  isEditableTarget,
+} from "@/hooks/useFileTreeKeyboard";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
@@ -270,6 +273,9 @@ export function FileTreePanel() {
       className="file-preview-tree flex h-full min-h-0 flex-col overflow-hidden bg-background"
       tabIndex={-1}
       onKeyDown={(e) => {
+        // Don't hijack keys when focus is inside an editable element (rename, search, etc.)
+        if (isEditableTarget(e)) return;
+
         if ((e.metaKey || e.ctrlKey) && e.key === "f") {
           e.preventDefault();
           search.openSearch();
