@@ -167,4 +167,56 @@ describe("resolveFilePathsFromContext", () => {
     // ``` (3 chars) cannot close ```` (4 chars), so line 4 is still inside
     expect(lines[4]).toBe("- `1.docx`");
   });
+
+  it("does not treat trailing text after marker as valid close", () => {
+    // "```not-a-close" is not a valid closing fence
+    const input = [
+      "**tests/**",
+      "- `1.docx`",
+      "```",
+      "```not-a-close",
+      "- `1.docx`",
+      "```",
+    ].join("\n");
+    const result = resolveFilePathsFromContext(input);
+    const lines = result.split("\n");
+    // Line 4 is still inside the fence (line 3 did not close it)
+    expect(lines[4]).toBe("- `1.docx`");
+  });
+
+  it("ignores fence markers with 4+ leading spaces", () => {
+    // 4 spaces = indented code block, not a real fence per CommonMark
+    // Verify that a properly fenced block with 0-3 spaces works,
+    // but 4-space-indented markers do NOT open a fence
+    const input = [
+      "```",
+      "    ~~~",
+      "```",
+      "**tests/**",
+      "- `1.docx`",
+    ].join("\n");
+    const result = resolveFilePathsFromContext(input);
+    const lines = result.split("\n");
+    // "    ~~~" (4 spaces) inside a ``` block does not close the fence,
+    // but "```" on line 2 (the real close) does. After fence, dir heading
+    // sets context and line 4 is transformed.
+    expect(lines[4]).toContain("`tests/1.docx`");
+
+    // Verify 4-space marker doesn't open a fence by checking subsequent
+    // real fence still works correctly:
+    const input3 = [
+      "    ```",
+      "**tests/**",
+      "- `1.docx`",
+      "```",
+      "- `2.docx`",
+      "```",
+    ].join("\n");
+    const result3 = resolveFilePathsFromContext(input3);
+    const lines3 = result3.split("\n");
+    // "    ```" didn't open fence, so "**tests/**" sets context
+    expect(lines3[2]).toContain("`tests/1.docx`");
+    // "```" on line 3 opens a real fence, line 4 is inside
+    expect(lines3[4]).toBe("- `2.docx`");
+  });
 });

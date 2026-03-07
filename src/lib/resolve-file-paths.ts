@@ -36,21 +36,25 @@ export function resolveFilePathsFromContext(markdown: string): string {
   const result: string[] = [];
 
   for (const line of lines) {
-    // Track fenced code blocks (CommonMark: closing fence must match
-    // the opening marker char and be at least as long)
-    const fenceMatch = /^(\s*(`{3,}|~{3,}))/.exec(line);
+    // Track fenced code blocks per CommonMark:
+    // - Max 3 leading spaces before the fence marker
+    // - Opening fence: marker (``` or ~~~) optionally followed by info string
+    // - Closing fence: marker only, followed by optional spaces (no other text)
+    const fenceMatch = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
     if (fenceMatch && fenceMatch[2]) {
       const marker = fenceMatch[2];
+      const trailing = fenceMatch[3] ?? "";
       if (fenceMarker === null) {
-        // Opening fence
+        // Opening fence (info string allowed after marker)
         fenceMarker = marker;
         result.push(line);
         continue;
       } else if (
         marker[0] === fenceMarker[0] &&
-        marker.length >= fenceMarker.length
+        marker.length >= fenceMarker.length &&
+        trailing.trim() === ""
       ) {
-        // Closing fence — same char type, at least same length
+        // Closing fence — same char, at least same length, no trailing text
         fenceMarker = null;
         result.push(line);
         continue;
