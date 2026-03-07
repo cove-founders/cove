@@ -1,4 +1,4 @@
-// FILE_SIZE_EXCEPTION: keyboard navigation integration adds state + hook wiring that cannot be split further
+// FILE_SIZE_EXCEPTION: file tree panel with many handler callbacks passed to children
 import { useCallback, useEffect, useState } from "react";
 import {
   useFileTreeKeyboard,
@@ -22,6 +22,7 @@ import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
 import { useFileTreeSearch } from "@/hooks/useFileTreeSearch";
 import { useFileClipboard } from "@/hooks/useFileClipboard";
+import { getDuplicateName } from "@/lib/file-utils";
 import { FileTreeItem, type ListDirEntry } from "./FileTreeItem";
 import { FileTreeDialogs } from "./FileTreeDialogs";
 import { FileTreeSearch } from "./FileTreeSearch";
@@ -250,6 +251,30 @@ export function FileTreePanel() {
     onDelete: dialogs.onDelete,
   });
 
+  const onDuplicate = useCallback(
+    async (path: string) => {
+      if (!workspaceRoot) return;
+      const fileName = path.split("/").pop() ?? path;
+      const parentDir = path.includes("/") ? path.replace(/\/[^/]+$/, "") : "";
+      const destName = getDuplicateName(fileName);
+      const toPath = parentDir ? `${parentDir}/${destName}` : destName;
+      try {
+        await invoke("copy_entry", { args: { workspaceRoot, fromPath: path, toPath } });
+      } catch {
+        // silently fail - file watcher will update if successful
+      }
+    },
+    [workspaceRoot],
+  );
+
+  const onOpenDefaultApp = useCallback(
+    (path: string) => {
+      if (!workspaceRoot) return;
+      invoke("open_with_app", { args: { workspaceRoot, path } }).catch(() => {});
+    },
+    [workspaceRoot],
+  );
+
   if (!workspaceRoot) {
     return (
       <div className="flex h-full flex-col overflow-hidden bg-background">
@@ -376,6 +401,8 @@ export function FileTreePanel() {
                     onCopy={clipboard.onCopy}
                     onCut={clipboard.onCut}
                     onPaste={clipboard.onPaste}
+                    onDuplicate={onDuplicate}
+                    onOpenDefaultApp={onOpenDefaultApp}
                     onRename={onRename}
                     onRevealInFinder={onRevealInFinder}
                     onCopyRelativePath={onCopyRelativePath}
