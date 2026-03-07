@@ -237,7 +237,7 @@ export function AssistantMessage({
               {orderedParts!.map((part, index) =>
                 part.type === "text" ? (
                   part.text ? (
-                    <div key={index} className="text-[14px] leading-relaxed">
+                    <div key={index} className="text-[14px] leading-relaxed break-words">
                       {renderMessageContent(part.text, !!streaming, index === orderedParts!.length - 1)}
                     </div>
                   ) : null
@@ -257,7 +257,7 @@ export function AssistantMessage({
                 )
               )}
               {content?.trim() && copyContent !== content && (
-                <div className="mt-1 text-[14px] leading-relaxed">
+                <div className="mt-1 text-[14px] leading-relaxed break-words">
                   {renderMessageContent(content, !!streaming, true)}
                 </div>
               )}
