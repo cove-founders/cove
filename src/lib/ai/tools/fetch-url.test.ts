@@ -76,7 +76,7 @@ describe("fetchUrlTool – failure with error message", () => {
 
     const result = await exec("https://bad.example.com");
     expect(result).toContain("bad.example.com");
-    expect(result).toContain("抓取失败");
+    expect(result).toContain("fetch failed");
     expect(result).toContain("connection refused");
   });
 });
@@ -94,7 +94,43 @@ describe("fetchUrlTool – failure with no error and no content", () => {
 
     const result = await exec("https://empty.example.com");
     expect(result).toContain("empty.example.com");
-    expect(result).toContain("未返回可读内容");
+    expect(result).toContain("returned no readable content");
+  });
+});
+
+describe("fetchUrlTool – low quality with cookie retry suggestion", () => {
+  it("suggests cookie retry when ok=true but low_quality and retry_with_cookies", async () => {
+    setupTauriMocks({
+      fetch_url: () => makeFetchResult({
+        ok: true,
+        source: "https://protected.example.com",
+        content_md: "short",
+        low_quality: true,
+        retry_with_cookies: true,
+      }),
+    });
+
+    const result = await exec("https://protected.example.com");
+    expect(result).toContain("low-quality content");
+    expect(result).toContain("useCookies=true");
+    expect(result).not.toContain("## ");
+  });
+
+  it("suggests cookie retry when ok=false and retry_with_cookies", async () => {
+    setupTauriMocks({
+      fetch_url: () => makeFetchResult({
+        ok: false,
+        source: "https://blocked.example.com",
+        error: "Forbidden (403)",
+        content_md: undefined,
+        retry_with_cookies: true,
+      }),
+    });
+
+    const result = await exec("https://blocked.example.com");
+    expect(result).toContain("fetch failed");
+    expect(result).toContain("Forbidden (403)");
+    expect(result).toContain("useCookies=true");
   });
 });
 
@@ -107,7 +143,7 @@ describe("fetchUrlTool – invoke throws", () => {
     });
 
     const result = await exec("https://timeout.example.com");
-    expect(result).toContain("抓取失败");
+    expect(result).toContain("Fetch failed");
     expect(result).toContain("network timeout");
   });
 
@@ -119,7 +155,7 @@ describe("fetchUrlTool – invoke throws", () => {
     });
 
     const result = await exec("https://example.com");
-    expect(result).toContain("抓取失败");
+    expect(result).toContain("Fetch failed");
     expect(result).toContain("unknown error string");
   });
 });

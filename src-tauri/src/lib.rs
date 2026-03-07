@@ -1,6 +1,7 @@
 mod attachment_commands;
 mod clipboard_commands;
 mod config_commands;
+mod cookie_commands;
 mod docx_commands;
 mod document_parsers;
 mod fetch_commands;
@@ -118,6 +119,7 @@ pub fn run() {
       attachment_commands::save_attachment_to_workspace_from_base64,
       attachment_commands::preprocess_attachment,
       clipboard_commands::read_clipboard_files,
+      cookie_commands::get_browser_cookies,
       fetch_commands::fetch_url,
       fs_commands::read_file,
       fs_commands::read_file_raw,
