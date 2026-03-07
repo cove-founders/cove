@@ -1,3 +1,4 @@
+// FILE_SIZE_EXCEPTION: security regression tests for glob pattern validation
 use super::run_js_inner;
 use std::fs;
 use tempfile::TempDir;
@@ -221,6 +222,30 @@ fn test_glob_limit() {
     "#);
     assert!(r.error.is_none());
     assert_eq!(r.result, "1000");
+}
+
+#[test]
+fn test_glob_absolute_pattern_rejected() {
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), "workspace.glob('/etc/*')");
+    assert!(r.error.is_some());
+    assert!(r.error.unwrap().contains("absolute glob patterns not allowed"));
+}
+
+#[test]
+fn test_glob_parent_traversal_rejected() {
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), "workspace.glob('../*')");
+    assert!(r.error.is_some());
+    assert!(r.error.unwrap().contains("parent traversal"));
+}
+
+#[test]
+fn test_glob_nested_parent_traversal_rejected() {
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), "workspace.glob('sub/../../*.txt')");
+    assert!(r.error.is_some());
+    assert!(r.error.unwrap().contains("parent traversal"));
 }
 
 // --- appendFile ---

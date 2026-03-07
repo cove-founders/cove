@@ -1,3 +1,4 @@
+// FILE_SIZE_EXCEPTION: security validation adds pre-check lines to glob handler
 use rquickjs::Function;
 
 use crate::fs_commands::{
@@ -235,6 +236,13 @@ fn register_glob<'js>(
     let f = Function::new(
         ctx.clone(),
         move |pattern: String| -> rquickjs::Result<Vec<String>> {
+            // Pre-validate: reject patterns that would scan outside workspace
+            if std::path::Path::new(&pattern).is_absolute() {
+                return Err(js_err("absolute glob patterns not allowed"));
+            }
+            if pattern.split('/').any(|seg| seg == "..") {
+                return Err(js_err("glob pattern must not contain parent traversal"));
+            }
             let root = std::path::Path::new(&wr);
             let full_pattern = root.join(&pattern).to_string_lossy().into_owned();
             let paths = glob::glob(&full_pattern).map_err(|e| js_err(&e.to_string()))?;
