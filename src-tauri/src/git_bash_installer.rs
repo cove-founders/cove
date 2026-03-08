@@ -43,30 +43,13 @@ static INSTALL_MUTEX: Mutex<()> = Mutex::new(());
 pub fn find_git_bash() -> Option<PathBuf> {
     #[cfg(windows)]
     {
-        log::info!("[git_bash] find_git_bash: trying registry...");
-        let r = try_registry();
-        log::info!("[git_bash] registry result: {:?}", r);
-        if let Some(p) = r {
-            return Some(p);
-        }
-
-        log::info!("[git_bash] trying common paths...");
-        let r = try_common_paths();
-        log::info!("[git_bash] common_paths result: {:?}", r);
-        if let Some(p) = r {
-            return Some(p);
-        }
-
-        log::info!("[git_bash] trying from git location...");
-        let r = try_from_git_location();
-        log::info!("[git_bash] git_location result: {:?}", r);
-        if let Some(p) = r {
-            return Some(p);
-        }
-
-        let managed = managed_git_root().join("bin").join("bash.exe");
-        log::info!("[git_bash] managed path {:?} exists: {}", managed, managed.exists());
-        managed.exists().then_some(managed)
+        try_registry()
+            .or_else(try_common_paths)
+            .or_else(try_from_git_location)
+            .or_else(|| {
+                let p = managed_git_root().join("bin").join("bash.exe");
+                p.exists().then_some(p)
+            })
     }
     #[cfg(not(windows))]
     {
