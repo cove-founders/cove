@@ -80,6 +80,19 @@ export async function maybeMeditate(
 
     console.info("[SOUL] integrity checks: PASS");
 
+    // Carry forward any existing private files the model omitted
+    const resultFileNames = new Set(result.privateFiles.map((f) => f.name));
+    const deletedNames = new Set(result.deleteFiles);
+    for (const existing of soul.private) {
+      if (existing.name === OBSERVATIONS_FILE) continue;
+      if (resultFileNames.has(existing.name)) continue;
+      if (deletedNames.has(existing.name)) continue;
+      console.warn(
+        `[SOUL] model omitted ${existing.name} -- carrying forward`,
+      );
+      result.privateFiles.push(existing);
+    }
+
     // Write updated SOUL.md with meditation timestamp (strip old markers first)
     const cleaned = result.soulMd
       .replace(/\n<!-- last-meditation:\S+ -->/g, "")
@@ -160,11 +173,12 @@ Rules:
 - Existing private files: review each one against new observations.
   Update with new insights and always include in output.
   Do not silently drop existing files.
-- observations.md: once an observation has been internalized into
-  Disposition/Style/Growth or distilled into another private file,
-  REMOVE IT entirely. Keep only observations that have NOT yet been
-  internalized. The goal is to keep observations.md short -- it is
-  a processing inbox, not an archive. Snapshots preserve the full history.
+- observations.md is a processing inbox, not an archive.
+  Once an observation has been internalized into Disposition/Style/Growth
+  or distilled into patterns.md / another private file, REPLACE IT with
+  a one-line summary (e.g. "[condensed -> patterns.md: prefers X]").
+  If even the summary adds no value, remove the line entirely.
+  The goal is to keep observations.md short.
 - You may create new files (e.g., patterns.md, relationship.md) to
   organize your understanding. File names and structure are your choice.
 - Technical preferences, project conventions, and factual information
