@@ -197,8 +197,12 @@ export function AppLayout() {
         setModelSelectorOpen(true);
       }
 
-      // ⌘, to open settings
-      if (meta && e.key === ",") {
+      // macOS: ⌘,  |  Windows/Linux: Ctrl+Shift+,
+      const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+      if (
+        (isMac && e.metaKey && !e.shiftKey && e.key === ",") ||
+        (!isMac && e.ctrlKey && e.shiftKey && e.key === ",")
+      ) {
         e.preventDefault();
         openSettingsWindow();
       }
