@@ -58,6 +58,11 @@ pub(super) fn register_officellm<'js>(
                     .map(|_| serde_json::json!({"status":"success"})),
                 "status" => crate::officellm::server::status()
                     .map(|info| serde_json::json!({"status":"success","data": info})),
+                "save" => {
+                    let path = args.get("path").map(|s| s.as_str());
+                    crate::officellm::server::save(path)
+                        .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
+                }
                 _ => {
                     let cli_args: Vec<String> = args
                         .iter()
