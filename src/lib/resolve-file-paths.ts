@@ -4,13 +4,13 @@ import { getPreviewKind } from "@/lib/preview-types";
  * Regex to detect directory context headings like `**tests/**` or `**tests**`.
  * Captures the directory name (group 1).
  */
-const DIR_HEADING_PATTERN = /\*\*([\w][\w.@-]*(?:\/[\w][\w.@-]*)*)\/?(\*\*)/;
+const DIR_HEADING_PATTERN = /\*\*([\w\p{L}][\w\p{L}.@-]*(?:\/[\w\p{L}][\w\p{L}.@-]*)*)\/?(\*\*)/u;
 
 /**
  * Matches a markdown list item containing a bare filename in backticks.
  * group 1 = filename (no `/` inside).
  */
-const BARE_FILE_IN_LIST = /^[\s]*[-*]\s+.*`([\w][\w.-]*\.\w{2,})`/;
+const BARE_FILE_IN_LIST = /^[\s]*[-*]\s+.*`([\w\p{L}][\w\p{L}.-]*\.\w{2,})`/u;
 
 /**
  * Pre-process markdown to resolve bare filenames under directory context headings.

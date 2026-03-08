@@ -77,6 +77,20 @@ describe("detectPreviewableFilePath", () => {
     expect(detectPreviewableFilePath("   ")).toBeNull();
   });
 
+  it("detects file paths with Chinese characters", () => {
+    expect(
+      detectPreviewableFilePath("/Users/lizc/Downloads/shihui/李继刚研究文档.docx"),
+    ).toBe("/Users/lizc/Downloads/shihui/李继刚研究文档.docx");
+  });
+
+  it("detects bare filename with Chinese characters", () => {
+    expect(detectPreviewableFilePath("报告.pdf")).toBe("报告.pdf");
+  });
+
+  it("detects path with Chinese directory and filename", () => {
+    expect(detectPreviewableFilePath("文档/报告.docx")).toBe("文档/报告.docx");
+  });
+
   it("returns an image file path", () => {
     // .png -> getPreviewKind returns 'image', which is supported
     expect(detectPreviewableFilePath("assets/images/logo.png")).toBe("assets/images/logo.png");

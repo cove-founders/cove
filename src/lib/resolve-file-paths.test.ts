@@ -80,6 +80,15 @@ describe("resolveFilePathsFromContext", () => {
     expect(resolveFilePathsFromContext("")).toBe("");
   });
 
+  it("resolves bare Chinese filenames under directory heading", () => {
+    const input = [
+      "**文档/**",
+      "- `报告.docx`",
+    ].join("\n");
+    const result = resolveFilePathsFromContext(input);
+    expect(result).toContain("`文档/报告.docx`");
+  });
+
   it("returns markdown without directory context unchanged", () => {
     const input = "Here is some `inline code` and `another.xyz` example.";
     expect(resolveFilePathsFromContext(input)).toBe(input);

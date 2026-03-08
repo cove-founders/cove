@@ -8,14 +8,14 @@ import { getPreviewKind } from "@/lib/preview-types";
  *
  * Must have a file extension to avoid false positives on arbitrary text.
  */
-const FILE_PATH_PATTERN = /^(?:\.{0,2}\/)?(?:[\w.@-]+\/)+[\w.-]+\.\w+$/;
+const FILE_PATH_PATTERN = /^(?:\.{0,2}\/)?(?:[\w\p{L}.@-]+\/)+[\w\p{L}.-]+\.\w+$/u;
 
 /**
  * Bare filename pattern: `report.docx`, `data.csv`, etc.
  * No directory separator required, but must have extension >= 2 chars.
  * Must start with a word character (not `.` — avoids `.gitignore` etc.).
  */
-const BARE_FILENAME_PATTERN = /^[\w][\w.-]*\.\w{2,}$/;
+const BARE_FILENAME_PATTERN = /^[\w\p{L}][\w\p{L}.-]*\.\w{2,}$/u;
 
 /**
  * Bare filenames that look like common prose terms rather than actual files.
