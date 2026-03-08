@@ -31,7 +31,15 @@ function formatOfficellmOutput(command: string, raw: string): string {
     if (parsed.status === "error") {
       return `Error: ${parsed.error ?? "unknown error"}`;
     }
+    // status with null data means no active session
+    if (command === "status" && (parsed.data === null || parsed.data === undefined)) {
+      return "No active document session.";
+    }
     if (parsed.data !== undefined && parsed.data !== null) {
+      // save: wrap path so UI can extract file chips
+      if (command === "save" && typeof parsed.data === "string") {
+        return `Document saved to: ${parsed.data}`;
+      }
       return typeof parsed.data === "string" ? parsed.data : JSON.stringify(parsed.data);
     }
     return `${command}: success`;

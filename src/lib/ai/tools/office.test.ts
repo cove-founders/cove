@@ -170,6 +170,30 @@ describe("officeTool – QuickJS commands", () => {
     expect(result).toBe("open: success");
   });
 
+  it("returns no-session message for status with null data", async () => {
+    setupTauriMocks({
+      run_js: () => jsResult('{"status":"success","data":null}'),
+    });
+    const result = await exec({ command: "status" });
+    expect(result).toBe("No active document session.");
+  });
+
+  it("returns session info for status with data", async () => {
+    setupTauriMocks({
+      run_js: () => jsResult('{"status":"success","data":{"path":"doc.docx","modified":false}}'),
+    });
+    const result = await exec({ command: "status" });
+    expect(result).toBe('{"path":"doc.docx","modified":false}');
+  });
+
+  it("formats save result with file path for UI extraction", async () => {
+    setupTauriMocks({
+      run_js: () => jsResult('{"status":"success","data":"/workspace/report.docx"}'),
+    });
+    const result = await exec({ command: "save" });
+    expect(result).toBe("Document saved to: /workspace/report.docx");
+  });
+
   it("passes args correctly for command calls", async () => {
     let capturedCode = "";
     setupTauriMocks({
