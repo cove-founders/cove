@@ -40,7 +40,6 @@ pub(super) fn register_officellm<'js>(
                     args.insert(key.to_string(), abs.to_string_lossy().into_owned());
                 }
             }
-
             let home = ollm_home
                 .as_deref()
                 .ok_or_else(|| js_err("officellm not installed"))?;
@@ -53,6 +52,19 @@ pub(super) fn register_officellm<'js>(
                         .map_err(|e| js_err(&e))?;
                     crate::officellm::server::open(path, home)
                         .map(|_| serde_json::json!({"status":"success"}))
+                }
+                "create" => {
+                    if let Some(v) = args.get("template") {
+                        let abs = ensure_inside_workspace_exists(&wr, v)
+                            .map_err(|e| js_err(&format!("{e:?}")))?;
+                        args.insert("template".to_string(), abs.to_string_lossy().into_owned());
+                    }
+                    let params = serde_json::to_value(&args)
+                        .map_err(|e| js_err(&e.to_string()))?;
+                    crate::officellm::server::create(
+                        &params, home, std::path::Path::new(&wr),
+                    )
+                    .map(|_| serde_json::json!({"status":"success"}))
                 }
                 "close" => crate::officellm::server::close()
                     .map(|_| serde_json::json!({"status":"success"})),
