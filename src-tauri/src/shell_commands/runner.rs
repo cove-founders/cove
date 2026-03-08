@@ -166,6 +166,8 @@ fn spawn_plain_command(
         (bash.into(), "-c")
     };
 
+    log::info!("[runner] spawn_plain_command: shell={:?} arg={:?} cmd={:?}", shell.as_ref(), shell_arg, cmd);
+
     let mut command = Command::new(shell.as_ref());
     command
         .arg(shell_arg)
