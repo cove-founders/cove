@@ -58,6 +58,7 @@ pub(super) fn register_officellm<'js>(
                     .map(|_| serde_json::json!({"status":"success"})),
                 "status" => crate::officellm::server::status()
                     .map(|info| serde_json::json!({"status":"success","data": info})),
+                // save() returns CommandResult (like call()), no need to wrap
                 "save" => {
                     let path = args.get("path").map(|s| s.as_str());
                     crate::officellm::server::save(path)
