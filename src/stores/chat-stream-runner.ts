@@ -94,6 +94,7 @@ export async function runStreamLoop(
       runtimeAvailability: { office: officeAvailable },
       subAgentContext,
       conversationId,
+      generateFn: meditateGen,
     });
   }
 
