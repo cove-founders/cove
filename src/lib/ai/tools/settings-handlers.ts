@@ -25,6 +25,9 @@ export interface SettingsInput {
   key?: string;
   value?: string;
   provider_type?: string;
+  provider_id?: string;
+  provider_name?: string;
+  protocol?: string;
   assistant_name?: string;
   model_id?: string;
 }

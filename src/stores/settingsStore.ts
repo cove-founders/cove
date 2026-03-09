@@ -6,28 +6,33 @@ import type { GeneralConfig } from "@/lib/config/types";
 type SettingsTab = "providers" | "general" | "skills" | "tools" | "workspaces";
 export type SendMessageShortcut = "enter" | "modifierEnter";
 
+export interface SelectedProvider {
+  type: ProviderType;
+  id?: string;
+}
+
 interface SettingsState {
   tab: SettingsTab;
-  selectedProviderType: ProviderType | null;
+  selectedProvider: SelectedProvider | null;
   sendMessageShortcut: SendMessageShortcut;
 
   setTab: (tab: SettingsTab) => void;
-  setSelectedProvider: (type: ProviderType | null) => void;
+  setSelectedProvider: (sel: SelectedProvider | null) => void;
   setSendMessageShortcut: (v: SendMessageShortcut) => void;
   loadAppSettings: () => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>()((set) => ({
   tab: "providers",
-  selectedProviderType: "deepseek",
+  selectedProvider: { type: "deepseek" },
   sendMessageShortcut: "enter",
 
   setTab(tab) {
     set({ tab });
   },
 
-  setSelectedProvider(type) {
-    set({ selectedProviderType: type });
+  setSelectedProvider(sel) {
+    set({ selectedProvider: sel });
   },
 
   setSendMessageShortcut(v) {
