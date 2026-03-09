@@ -19,7 +19,6 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/ai/model-service", () => ({
-  testConnection: vi.fn(),
   getModelOption: vi.fn(),
   verifyAndFetchModels: vi.fn(),
 }));
@@ -34,7 +33,6 @@ vi.mock("ai", () => ({
 import { useDataStore } from "@/stores/dataStore";
 import { emit } from "@tauri-apps/api/event";
 import {
-  testConnection,
   getModelOption,
   verifyAndFetchModels,
 } from "@/lib/ai/model-service";
@@ -114,13 +112,13 @@ describe("handleProvider - list/get/set", () => {
 });
 
 describe("handleProvider - validate", () => {
-  it("connection OK with models and capabilities", async () => {
+  it("connection OK with models and capabilities (always hits API)", async () => {
     const provider = makeProvider();
     mockProviders([provider]);
-    vi.mocked(testConnection).mockResolvedValue({
-      ok: true,
-      models: ["deepseek-chat", "deepseek-coder"],
-    });
+    vi.mocked(verifyAndFetchModels).mockResolvedValue([
+      "deepseek-chat",
+      "deepseek-coder",
+    ]);
     vi.mocked(getModelOption).mockImplementation((_p, modelId) => {
       if (modelId === "deepseek-chat")
         return { tool_calling: true, reasoning: true };
@@ -135,14 +133,14 @@ describe("handleProvider - validate", () => {
     expect(result).toContain("deepseek-chat");
     expect(result).toContain("tool_calling=true");
     expect(result).toContain("deepseek-coder");
+    expect(verifyAndFetchModels).toHaveBeenCalledWith(provider);
   });
 
   it("connection failed returns error", async () => {
     mockProviders([makeProvider()]);
-    vi.mocked(testConnection).mockResolvedValue({
-      ok: false,
-      error: "Invalid API key",
-    });
+    vi.mocked(verifyAndFetchModels).mockRejectedValue(
+      new Error("Invalid API key"),
+    );
 
     const result = await handleProvider({
       action: "validate",
@@ -228,10 +226,11 @@ describe("handleProvider - probe", () => {
     mockProviders([makeProvider({ config: "{}" })]);
   });
 
-  it("detects tool_calling=true when generateText with tools succeeds", async () => {
+  it("detects tool_calling=true only when model emits a tool call", async () => {
     vi.mocked(generateText).mockResolvedValue({
-      text: "ok",
+      text: "",
       reasoning: undefined,
+      toolCalls: [{ toolName: "ping", args: { msg: "ok" } }],
     } as never);
 
     const result = await handleProvider({
@@ -241,6 +240,21 @@ describe("handleProvider - probe", () => {
     });
     expect(result).toContain("tool_calling: supported");
     expect(result).toContain("Capabilities saved");
+  });
+
+  it("detects tool_calling=false when model returns without tool calls", async () => {
+    vi.mocked(generateText).mockResolvedValue({
+      text: "ok",
+      reasoning: undefined,
+      toolCalls: [],
+    } as never);
+
+    const result = await handleProvider({
+      action: "probe",
+      provider_type: "deepseek",
+      model_id: "deepseek-chat",
+    });
+    expect(result).toContain("tool_calling: not supported");
   });
 
   it("detects tool_calling=false when tool call throws", async () => {
@@ -258,8 +272,9 @@ describe("handleProvider - probe", () => {
 
   it("detects reasoning from result.reasoning", async () => {
     vi.mocked(generateText).mockResolvedValue({
-      text: "ok",
+      text: "",
       reasoning: "thinking...",
+      toolCalls: [{ toolName: "ping", args: { msg: "ok" } }],
     } as never);
 
     const result = await handleProvider({
@@ -295,8 +310,9 @@ describe("handleProvider - probe", () => {
 
   it("persists detected capabilities to config.model_options", async () => {
     vi.mocked(generateText).mockResolvedValue({
-      text: "ok",
+      text: "",
       reasoning: "thought",
+      toolCalls: [{ toolName: "ping", args: { msg: "ok" } }],
     } as never);
 
     await handleProvider({

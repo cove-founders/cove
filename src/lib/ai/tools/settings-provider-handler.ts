@@ -2,7 +2,6 @@ import { useDataStore } from "@/stores/dataStore";
 import { verifyApiKey } from "@/lib/ai/model-verify";
 import { emit } from "@tauri-apps/api/event";
 import {
-  testConnection,
   getModelOption,
   verifyAndFetchModels,
 } from "@/lib/ai/model-service";
@@ -148,22 +147,23 @@ async function handleSet(
 }
 
 async function handleValidate(provider: Provider): Promise<string> {
-  const result = await testConnection(provider);
-  if (!result.ok)
-    return `Provider ${provider.name}: connection FAILED — ${result.error}`;
+  try {
+    const result = await verifyAndFetchModels(provider);
+    const models = Array.isArray(result) ? result : result.modelIds;
+    const lines = models.map((m) => {
+      const opt = getModelOption(provider, m);
+      const caps = formatCapabilities(opt);
+      return `- ${m}${caps ? `: ${caps}` : ""}`;
+    });
 
-  const models = result.models ?? [];
-  const lines = models.map((m) => {
-    const opt = getModelOption(provider, m);
-    const caps = formatCapabilities(opt);
-    return `- ${m}${caps ? `: ${caps}` : ""}`;
-  });
-
-  return [
-    `Provider ${provider.name}: connection OK`,
-    `Available models (${models.length}):`,
-    ...lines,
-  ].join("\n");
+    return [
+      `Provider ${provider.name}: connection OK`,
+      `Available models (${models.length}):`,
+      ...lines,
+    ].join("\n");
+  } catch (e) {
+    return `Provider ${provider.name}: connection FAILED — ${e instanceof Error ? e.message : String(e)}`;
+  }
 }
 
 async function handleFetchModels(provider: Provider): Promise<string> {
@@ -193,16 +193,21 @@ async function handleProbe(
   try {
     const result = await generateText({
       model,
-      messages: [{ role: "user", content: "Reply with the single word 'ok'." }],
-      maxOutputTokens: 16,
+      messages: [
+        {
+          role: "user",
+          content: "Call the ping tool with msg 'ok'. Do not reply with text.",
+        },
+      ],
+      maxOutputTokens: 64,
       tools: {
         ping: aiTool({
-          description: "Respond",
+          description: "Respond with a message",
           inputSchema: z.object({ msg: z.string() }),
         }),
       },
     });
-    detected.tool_calling = true;
+    detected.tool_calling = result.toolCalls && result.toolCalls.length > 0;
     if (result.reasoning) detected.reasoning = true;
   } catch {
     detected.tool_calling = false;
