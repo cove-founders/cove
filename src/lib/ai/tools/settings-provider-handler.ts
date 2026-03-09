@@ -200,6 +200,7 @@ async function handleProbe(
         },
       ],
       maxOutputTokens: 64,
+      toolChoice: "required",
       tools: {
         ping: aiTool({
           description: "Respond with a message",
