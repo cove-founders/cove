@@ -2,7 +2,7 @@ import type { Provider } from "@/db/types";
 import type { ModelMessage } from "ai";
 import { getModel } from "@/lib/ai/provider-factory";
 import { getModelOption } from "@/lib/ai/model-service";
-import { runAgent } from "@/lib/ai/agent";
+import { runAgent, stripToolMessages } from "@/lib/ai/agent";
 import { reportAgentRunMetrics, trackAgentPart } from "@/lib/ai/agent-metrics";
 import type { AgentRunMetrics } from "@/lib/ai/agent-metrics";
 import { handleAgentStream, type StreamResult } from "@/lib/ai/stream-handler";
@@ -67,31 +67,45 @@ export async function runStreamLoop(
   const meditateGen = async (p: string) => (await generateText({ model, prompt: p, maxOutputTokens: 1000 })).text;
   maybeMeditate(meditateGen).catch((e) => console.error("[SOUL] meditation error:", e));
 
-  // Build base tools first (without spawn_agent) to use as parentTools
-  const baseTools = getAgentTools(enabledSkillNames, {
-    runtimeAvailability: { office: officeAvailable },
-    conversationId,
-  });
-  const subAgentContext: SubAgentContext = {
-    model,
-    parentTools: baseTools,
-    enabledSkillNames,
-    abortSignal,
-    workspacePath,
-    currentDepth: 0,
-    maxDepth: 2,
-  };
-  const tools = getAgentTools(enabledSkillNames, {
-    runtimeAvailability: { office: officeAvailable },
-    subAgentContext,
-    conversationId,
-  });
+  // Determine if model supports tool calling:
+  // - Explicit true/false from model options takes precedence
+  // - Ollama defaults to false (most local models lack tool support)
+  // - All other providers default to true
+  const supportsTools = modelOption?.tool_calling === true
+    || (modelOption?.tool_calling !== false && provider.type !== "ollama");
+
+  // Build tools only if model supports tool calling
+  let tools: ReturnType<typeof getAgentTools> = {};
+  if (supportsTools) {
+    const baseTools = getAgentTools(enabledSkillNames, {
+      runtimeAvailability: { office: officeAvailable },
+      conversationId,
+    });
+    const subAgentContext: SubAgentContext = {
+      model,
+      parentTools: baseTools,
+      enabledSkillNames,
+      abortSignal,
+      workspacePath,
+      currentDepth: 0,
+      maxDepth: 2,
+    };
+    tools = getAgentTools(enabledSkillNames, {
+      runtimeAvailability: { office: officeAvailable },
+      subAgentContext,
+      conversationId,
+    });
+  }
+
+  // Strip tool-call/tool-result messages when model doesn't support tools,
+  // so prior tool history doesn't confuse the model or trigger API errors.
+  const messages = supportsTools ? modelMessages : stripToolMessages(modelMessages);
 
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
     const attemptResult = runAgent({
       model,
-      messages: modelMessages,
+      messages,
       system: buildSystemPrompt({ workspacePath, officeAvailable, soulPrompt }),
       tools,
       abortSignal,
