@@ -47,7 +47,7 @@ export function getAgentTools(
     runtimeAvailability?: Record<string, boolean>;
     subAgentContext?: SubAgentContext;
     conversationId?: string;
-    generateFn?: (prompt: string) => Promise<string>;
+    generateFn?: (prompt: string) => Promise<import("../soul-meditate").MeditateGenResult>;
   },
 ): ToolRecord {
   const tools: ToolRecord = {};

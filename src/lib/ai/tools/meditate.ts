@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
-import { forceMeditate, type MeditationOutcome } from "../soul-meditate";
+import { forceMeditate, type MeditationOutcome, type MeditateGenResult } from "../soul-meditate";
 
-type GenerateFn = (prompt: string) => Promise<string>;
+type GenerateFn = (prompt: string) => Promise<MeditateGenResult>;
 
 export function createMeditateTool(generateFn: GenerateFn) {
   return tool({

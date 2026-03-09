@@ -44,7 +44,7 @@ function formatLimit(chars: number): string {
  * Returns structured outcome. Serialized via concurrency guard.
  */
 export async function forceMeditate(
-  generateFn: (prompt: string) => Promise<string>,
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
 ): Promise<MeditationOutcome> {
   const run = async (): Promise<MeditationOutcome> => {
     if (meditationLock) await meditationLock.catch(() => {});
@@ -63,8 +63,13 @@ export async function forceMeditate(
  * Check if meditation is needed and perform it if so.
  * Call at conversation start (before first message).
  */
+export interface MeditateGenResult {
+  text: string;
+  finishReason: string;
+}
+
 export async function maybeMeditate(
-  generateFn: (prompt: string) => Promise<string>,
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
 ): Promise<void> {
   const soul = await readSoul();
   const obsFile = findPrivateFile(soul.private, OBSERVATIONS_FILE);
@@ -92,7 +97,7 @@ export async function maybeMeditate(
 }
 
 async function doMeditate(
-  generateFn: (prompt: string) => Promise<string>,
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
 ): Promise<MeditationOutcome> {
   const soul = await readSoul();
   const obsFile = findPrivateFile(soul.private, OBSERVATIONS_FILE);
@@ -108,7 +113,13 @@ async function doMeditate(
     const dnaBefore = extractDnaSection(soul.public);
     const dispositionBefore = extractDispositionEntries(soul.public);
     const prompt = buildMeditationPrompt(soul.public, soul.private);
-    const raw = await generateFn(prompt);
+    const { text: raw, finishReason } = await generateFn(prompt);
+
+    if (finishReason === "length") {
+      console.warn("[SOUL] meditation output truncated (finishReason=length) -- aborting");
+      return { success: false, error: "Output truncated", snapshotTimestamp: snapshotTs };
+    }
+
     const result = parseMeditationResult(raw);
 
     if (!result) {

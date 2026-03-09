@@ -99,7 +99,7 @@ describe("getAgentTools", () => {
 
   describe("meditate", () => {
     it("includes meditate when generateFn provided", () => {
-      const tools = getAgentTools([], { generateFn: async () => "" });
+      const tools = getAgentTools([], { generateFn: async () => ({ text: "", finishReason: "stop" }) });
       expect(Object.keys(tools)).toContain("meditate");
     });
 
