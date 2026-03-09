@@ -64,7 +64,10 @@ export async function runStreamLoop(
   const soulPrompt = formatSoulPrompt(await readSoul());
 
   // Fire-and-forget: meditation check at conversation start
-  const meditateGen = async (p: string) => (await generateText({ model, prompt: p, maxOutputTokens: 1000 })).text;
+  const meditateGen = async (p: string) => {
+    const result = await generateText({ model, prompt: p, maxOutputTokens: 8192 });
+    return { text: result.text, finishReason: result.finishReason };
+  };
   maybeMeditate(meditateGen).catch((e) => console.error("[SOUL] meditation error:", e));
 
   // Determine if model supports tool calling:

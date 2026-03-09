@@ -32,8 +32,13 @@ function formatLimit(chars: number): string {
  * Check if meditation is needed and perform it if so.
  * Call at conversation start (before first message).
  */
+export interface MeditateGenResult {
+  text: string;
+  finishReason: string;
+}
+
 export async function maybeMeditate(
-  generateFn: (prompt: string) => Promise<string>,
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
 ): Promise<void> {
   const soul = await readSoul();
   const obsFile = findPrivateFile(soul.private, OBSERVATIONS_FILE);
@@ -63,7 +68,13 @@ export async function maybeMeditate(
   const prompt = buildMeditationPrompt(soul.public, soul.private);
 
   try {
-    const raw = await generateFn(prompt);
+    const { text: raw, finishReason } = await generateFn(prompt);
+
+    if (finishReason === "length") {
+      console.warn("[SOUL] meditation output truncated (finishReason=length) -- aborting");
+      return;
+    }
+
     const result = parseMeditationResult(raw);
 
     if (!result) {
