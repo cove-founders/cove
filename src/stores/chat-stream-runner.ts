@@ -2,7 +2,7 @@ import type { Provider } from "@/db/types";
 import type { ModelMessage } from "ai";
 import { getModel } from "@/lib/ai/provider-factory";
 import { getModelOption } from "@/lib/ai/model-service";
-import { runAgent } from "@/lib/ai/agent";
+import { runAgent, stripToolMessages } from "@/lib/ai/agent";
 import { reportAgentRunMetrics, trackAgentPart } from "@/lib/ai/agent-metrics";
 import type { AgentRunMetrics } from "@/lib/ai/agent-metrics";
 import { handleAgentStream, type StreamResult } from "@/lib/ai/stream-handler";
@@ -97,11 +97,15 @@ export async function runStreamLoop(
     });
   }
 
+  // Strip tool-call/tool-result messages when model doesn't support tools,
+  // so prior tool history doesn't confuse the model or trigger API errors.
+  const messages = supportsTools ? modelMessages : stripToolMessages(modelMessages);
+
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
     const attemptResult = runAgent({
       model,
-      messages: modelMessages,
+      messages,
       system: buildSystemPrompt({ workspacePath, officeAvailable, soulPrompt }),
       tools,
       abortSignal,
