@@ -11,6 +11,8 @@ export interface LayoutConfig {
   leftSidebarWidth: number;
   chatWidth: number;
   filePanelOpen: boolean;
+  fileTreeOpen: boolean;
+  filePreviewOpen: boolean;
   fileTreeWidth: number;
   filePreviewWidth: number;
   fileTreeShowHidden: boolean;
@@ -38,6 +40,8 @@ export const CONFIG_DEFAULTS = {
     leftSidebarWidth: 260,
     chatWidth: 640,
     filePanelOpen: true,
+    fileTreeOpen: true,
+    filePreviewOpen: true,
     fileTreeWidth: 260,
     filePreviewWidth: 360,
     fileTreeShowHidden: true,

@@ -12,7 +12,7 @@ vi.mock("@/db/repos/conversationRepo", () => ({
   },
 }));
 vi.mock("@/db/repos/messageRepo", () => ({
-  messageRepo: { getByConversation: vi.fn(), deleteByConversation: vi.fn() },
+  messageRepo: { deleteByConversation: vi.fn() },
 }));
 vi.mock("@/db/repos/providerRepo", () => ({
   providerRepo: {
@@ -52,7 +52,6 @@ import { createStoreReset } from "@/test-utils/mock-store";
 import {
   makeAssistant,
   makeConversation,
-  makeMessage,
 } from "@/test-utils/fixtures/messages";
 import { makeProvider } from "@/test-utils/fixtures/providers";
 
@@ -207,57 +206,14 @@ describe("dataStore", () => {
     });
   });
 
-  describe("loadMessages", () => {
-    it("loads messages for the specified conversationId", async () => {
-      const m1 = makeMessage({ conversation_id: "conv-42" });
-      const m2 = makeMessage({ conversation_id: "conv-42" });
-      vi.mocked(messageRepo.getByConversation).mockResolvedValue([m1, m2]);
-
-      await useDataStore.getState().loadMessages("conv-42");
-
-      expect(messageRepo.getByConversation).toHaveBeenCalledWith("conv-42");
-      expect(useDataStore.getState().messages).toEqual([m1, m2]);
-    });
-
-    it("sets empty array when conversation has no messages", async () => {
-      vi.mocked(messageRepo.getByConversation).mockResolvedValue([]);
-      await useDataStore.getState().loadMessages("conv-empty");
-      expect(useDataStore.getState().messages).toEqual([]);
-    });
-  });
-
   describe("setActiveConversation", () => {
-    it("sets activeConversationId and stores in localStorage", async () => {
-      vi.mocked(messageRepo.getByConversation).mockResolvedValue([]);
-
+    it("sets activeConversationId and stores in localStorage", () => {
       useDataStore.getState().setActiveConversation("conv-1");
 
       expect(useDataStore.getState().activeConversationId).toBe("conv-1");
       expect(localStorage.getItem("office_chat_active_conversation_id")).toBe(
         "conv-1",
       );
-    });
-
-    it("clears messages immediately when setting a new conversation", () => {
-      // Pre-load messages into state
-      useDataStore.setState({ messages: [makeMessage()] });
-
-      vi.mocked(messageRepo.getByConversation).mockResolvedValue([]);
-      useDataStore.getState().setActiveConversation("conv-2");
-
-      // Messages are cleared synchronously before async load
-      expect(useDataStore.getState().messages).toEqual([]);
-    });
-
-    it("calls loadMessages with the given id", async () => {
-      const msg = makeMessage({ conversation_id: "conv-5" });
-      vi.mocked(messageRepo.getByConversation).mockResolvedValue([msg]);
-
-      useDataStore.getState().setActiveConversation("conv-5");
-
-      await vi.waitFor(() => {
-        expect(messageRepo.getByConversation).toHaveBeenCalledWith("conv-5");
-      });
     });
 
     it("sets activeConversationId to null and removes localStorage key", () => {
@@ -272,10 +228,6 @@ describe("dataStore", () => {
       ).toBeNull();
     });
 
-    it("does not call loadMessages when id is null", () => {
-      useDataStore.getState().setActiveConversation(null);
-      expect(messageRepo.getByConversation).not.toHaveBeenCalled();
-    });
   });
 
   describe("updateConversation", () => {
@@ -334,10 +286,7 @@ describe("dataStore", () => {
 
     it("clears activeConversationId and localStorage when deleting the active conversation", async () => {
       localStorage.setItem("office_chat_active_conversation_id", "conv-active");
-      useDataStore.setState({
-        activeConversationId: "conv-active",
-        messages: [makeMessage()],
-      });
+      useDataStore.setState({ activeConversationId: "conv-active" });
       vi.mocked(summaryRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(messageRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.delete).mockResolvedValue(undefined);
@@ -346,7 +295,6 @@ describe("dataStore", () => {
       await useDataStore.getState().deleteConversation("conv-active");
 
       expect(useDataStore.getState().activeConversationId).toBeNull();
-      expect(useDataStore.getState().messages).toEqual([]);
       expect(
         localStorage.getItem("office_chat_active_conversation_id"),
       ).toBeNull();

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
 import { useDataStore } from "@/stores/dataStore";
+import { useStreamStore } from "@/stores/streamStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
@@ -44,14 +45,16 @@ export function ChatInput({
   const addDraftAttachments = useChatStore((s) => s.addDraftAttachments);
   const removeDraftAttachment = useChatStore((s) => s.removeDraftAttachment);
   const draftAttachments = useChatStore((s) => s.draftAttachments);
-  const isStreaming = useChatStore((s) => s.isStreaming);
   const modelId = useChatStore((s) => s.modelId);
   const providerId = useChatStore((s) => s.providerId);
   const providers = useDataStore((s) => s.providers);
+  const activeConversationId = useDataStore((s) => s.activeConversationId);
+  const streams = useStreamStore((s) => s.streams);
+  const isStreaming = activeConversationId ? (streams[activeConversationId]?.isStreaming ?? false) : false;
+  const isCompressing = activeConversationId ? (streams[activeConversationId]?.isCompressing ?? false) : false;
   const modelSelectorOpen = onModelSelectorOpenChange != null ? (modelSelectorOpenProp ?? false) : modelSelectorOpenLocal;
   const setModelSelectorOpen = onModelSelectorOpenChange ?? setModelSelectorOpenLocal;
   const error = useChatStore((s) => s.error);
-  const isCompressing = useChatStore((s) => s.isCompressing);
   const sendMessageShortcut = useSettingsStore((s) => s.sendMessageShortcut);
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const externalSkills = useSkillsStore((s) => s.externalSkills);
@@ -130,7 +133,10 @@ export function ChatInput({
 
   useEffect(() => { const el = textareaRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }, [message]);
 
-  const handleAttachFiles = async () => { await pickAndSaveAttachments(addDraftAttachments, setAttachError, activeWorkspace?.path); };
+  const handleAttachFiles = async () => {
+    const wsPath = activeWorkspace && !activeWorkspace.is_default ? activeWorkspace.path : undefined;
+    await pickAndSaveAttachments(addDraftAttachments, setAttachError, wsPath, activeConversationId);
+  };
 
   const handleSend = () => {
     if (!canSend) return;
@@ -150,14 +156,15 @@ export function ChatInput({
     for (let i = 0; i < items.length; i++) { const item = items[i]; if (item?.kind === "file") { const f = item.getAsFile(); if (f && isImageFile(f)) files.push(f); } }
     if (files.length === 0) return;
     e.preventDefault();
-    const attachments = await imageFilesToDraftAttachments(files, activeWorkspace?.path);
+    const wsPath = activeWorkspace && !activeWorkspace.is_default ? activeWorkspace.path : undefined;
+    const attachments = await imageFilesToDraftAttachments(files, wsPath);
     if (attachments.length > 0) { addDraftAttachments(attachments); setAttachError(null); }
   };
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation();
     const files = e.dataTransfer?.files; if (!files?.length) return;
-    const wsPath = activeWorkspace?.path;
+    const wsPath = activeWorkspace && !activeWorkspace.is_default ? activeWorkspace.path : undefined;
     const all = [...(await imageFilesToDraftAttachments(Array.from(files), wsPath)), ...(await nonImageFilesToDraftAttachments(Array.from(files), wsPath))];
     if (all.length > 0) { addDraftAttachments(all); setAttachError(null); }
   };

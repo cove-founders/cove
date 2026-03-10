@@ -8,7 +8,7 @@ export interface AgentOptions {
   model: LanguageModel;
   messages: ModelMessage[];
   system?: string;
-  tools: ToolRecord;
+  tools?: ToolRecord;
   abortSignal?: AbortSignal;
   maxSteps?: number;
   /** 最大输出 token 数，来自 Provider 模型选项时可传入 */
@@ -137,6 +137,37 @@ function reconstructFromParts(partsJson: string, reasoning?: string | null): Mod
   }
 }
 
+/**
+ * Strip tool-call and tool-result messages from a ModelMessage array.
+ * Used when the target model does not support tool calling — keeps only
+ * text/reasoning content so the conversation history remains coherent.
+ */
+export function stripToolMessages(messages: ModelMessage[]): ModelMessage[] {
+  const result: ModelMessage[] = [];
+  for (const msg of messages) {
+    const role = (msg as Record<string, unknown>).role as string;
+
+    // Drop tool-result messages entirely
+    if (role === "tool") continue;
+
+    // For assistant messages, keep only text/reasoning parts
+    if (role === "assistant") {
+      const content = (msg as Record<string, unknown>).content;
+      if (Array.isArray(content)) {
+        const kept = (content as Array<Record<string, unknown>>).filter(
+          (p) => p.type === "text" || p.type === "reasoning",
+        );
+        if (kept.length === 0) continue;
+        result.push({ ...msg, content: kept } as unknown as ModelMessage);
+        continue;
+      }
+    }
+
+    result.push(msg);
+  }
+  return result;
+}
+
 export interface ToModelMessagesOptions {
   /** Timestamp: skip non-summary messages with created_at <= this value */
   summaryUpTo?: string;
@@ -208,13 +239,13 @@ const DEFAULT_MAX_STEPS = 30;
 
 export function runAgent(options: AgentOptions) {
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
+  const hasTools = options.tools && Object.keys(options.tools).length > 0;
 
   return streamText({
     model: options.model,
     system: options.system ?? buildSystemPrompt({}),
     messages: options.messages,
-    tools: options.tools,
-    stopWhen: stepCountIs(maxSteps),
+    ...(hasTools ? { tools: options.tools, stopWhen: stepCountIs(maxSteps) } : {}),
     abortSignal: options.abortSignal,
     ...(options.maxOutputTokens != null && options.maxOutputTokens > 0
       ? { maxOutputTokens: options.maxOutputTokens }

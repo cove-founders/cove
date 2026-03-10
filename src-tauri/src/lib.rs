@@ -1,11 +1,15 @@
 mod attachment_commands;
+mod git_bash_installer;
+mod clipboard_commands;
 mod config_commands;
+mod cookie_commands;
 mod docx_commands;
 mod document_parsers;
 mod fetch_commands;
 mod fs_commands;
 mod js_interpreter;
 mod officellm;
+mod render_commands;
 mod sandbox;
 mod sidecar;
 mod shell_commands;
@@ -106,6 +110,26 @@ pub fn run() {
         }
       });
 
+      // Windows: detect/install Git Bash in background; push result to frontend.
+      #[cfg(windows)]
+      {
+        let app_handle = app.handle().clone();
+        let _ = app_handle.emit("git-bash-status", serde_json::json!({ "status": "checking" }));
+        std::thread::spawn(move || {
+          match git_bash_installer::ensure_git_bash() {
+            Ok(_) => {
+              let _ = app_handle.emit("git-bash-status", serde_json::json!({ "status": "ready" }));
+            }
+            Err(msg) => {
+              let _ = app_handle.emit("git-bash-status", serde_json::json!({
+                "status": "failed",
+                "message": msg
+              }));
+            }
+          }
+        });
+      }
+
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
@@ -116,21 +140,32 @@ pub fn run() {
       attachment_commands::save_attachment_to_workspace,
       attachment_commands::save_attachment_to_workspace_from_base64,
       attachment_commands::preprocess_attachment,
+      clipboard_commands::read_clipboard_files,
+      cookie_commands::get_browser_cookies,
       fetch_commands::fetch_url,
+      render_commands::render_url,
+      render_commands::render_extract_content,
       fs_commands::read_file,
       fs_commands::read_file_raw,
       fs_commands::write_file,
+      fs_commands::create_new_file,
       fs_commands::write_binary_file,
       fs_commands::stat_file,
       fs_commands::list_dir,
+      fs_commands::walk_files,
       fs_commands::read_file_as_data_url,
       fs_commands::open_with_app,
       fs_commands::detect_office_apps,
       fs_commands::create_dir,
+      fs_commands::create_file,
       fs_commands::move_file,
       fs_commands::remove_entry,
       fs_commands::copy_entry,
+      fs_commands::copy_external_file,
       fs_commands::reveal_in_finder,
+      fs_commands::save_file_version,
+      fs_commands::list_file_versions,
+      fs_commands::read_file_version,
       fs_commands::read_office_text,
       fs_commands::write_office_text,
       workspace_watcher::watch_workspace_command,
@@ -144,6 +179,7 @@ pub fn run() {
       skill_commands::write_skill,
       skill_commands::delete_skill,
       skill_commands::read_skill,
+      skill_commands::read_skill_from_path,
       skill_resource_commands::read_skill_resource,
       soul_commands::read_soul,
       soul_commands::write_soul,
@@ -155,6 +191,7 @@ pub fn run() {
       soul_backup::import_soul,
       soul_backup::soul_health,
       soul_backup::reset_soul,
+      git_bash_installer::check_git_bash_status,
       config_commands::read_config,
       config_commands::write_config,
       docx_commands::docx_to_pdf,
@@ -165,6 +202,7 @@ pub fn run() {
       officellm::officellm_init,
       officellm::officellm_call,
       officellm::officellm_open,
+      officellm::officellm_create,
       officellm::officellm_save,
       officellm::officellm_close,
       officellm::officellm_status,

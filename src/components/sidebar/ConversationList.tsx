@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useMemo } from "react";
 import { useDataStore } from "@/stores/dataStore";
 import { useChatStore } from "@/stores/chatStore";
+import { useStreamStore } from "@/stores/streamStore";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { ConversationItem } from "./ConversationItem";
 import type { Conversation } from "@/db/types";
@@ -52,7 +53,9 @@ export function ConversationList({ searchQuery, workspacePath }: ConversationLis
   const setPinned = useDataStore((s) => s.setPinned);
   const deleteConversation = useDataStore((s) => s.deleteConversation);
   const loadMessages = useChatStore((s) => s.loadMessages);
-  const streamingConversationId = useChatStore((s) => s.streamingConversationId);
+  const streams = useStreamStore((s) => s.streams);
+  const streamingConversationId = Object.keys(streams).find((id) => streams[id]?.isStreaming) ?? null;
+  const unreadIds = useDataStore((s) => s.unreadIds);
   const setActivePage = useLayoutStore((s) => s.setActivePage);
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -150,6 +153,7 @@ const handleRenameSubmit = async () => {
                     conversation={conv}
                     active={conv.id === activeConversationId}
                     isStreaming={conv.id === streamingConversationId}
+                    hasUnread={unreadIds.has(conv.id)}
                     isEditing={editingId === conv.id}
                     editingTitle={editingTitle}
                     onEditingTitleChange={setEditingTitle}

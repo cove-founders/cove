@@ -113,9 +113,15 @@
     "deleteConfirmTitle": "Delete",
     "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This cannot be undone.",
     "folderAlreadyExists": "A folder with this name already exists.",
+    "fileAlreadyExists": "A file with this name already exists.",
+    "newMarkdown": "New Markdown",
     "setContextAnchor": "Set as AI Context",
     "contextAnchorActive": "AI Context",
-    "search": "Search files"
+    "search": "Search files",
+    "duplicate": "Duplicate",
+    "openInDefaultApp": "Open in Default App",
+    "newFile": "New File",
+    "invalidFileName": "Invalid file name."
   },
   "context": {
     "label": "Context",
@@ -147,13 +153,26 @@
     "docxLoadError": "Failed to parse DOCX",
     "docxRenderError": "Failed to render DOCX",
     "pageNumber": "Page {{current}} / {{total}}",
-    "searchPlaceholder": "Filter files\u2026",
+    "searchPlaceholder": "Filter files…",
     "searchFiles": "Search files",
     "csvRows": "rows",
     "csvCols": "columns",
     "csvTruncated": "showing {{rows}} rows x {{cols}} columns",
     "dirItems": "items",
-    "dirLabel": "folder"
+    "dirLabel": "folder",
+    "autoSaving": "Saving…",
+    "autoSaved": "Saved",
+    "autoSaveError": "Save failed",
+    "history": "Version History",
+    "historyEmpty": "No history yet",
+    "restore": "Restore",
+    "collapseAll": "Collapse all",
+    "closeWorkspace": "Close workspace",
+    "closeExplorer": "Close explorer",
+    "closePreview": "Close preview",
+    "openInPanel": "Open in panel",
+    "pdfFallback": "PDF preview is available in the side panel",
+    "officeFallback": "Office document preview is available in the side panel"
   },
   "common": {
     "settings": "Settings"
@@ -227,16 +246,17 @@
     "newString": "New string:",
     "jsCode": "JavaScript code:",
     "sandboxed": "Sandboxed",
-    "loading": "Loading tools…"
+    "loading": "Loading tools…",
+    "awaitingAuth": "Awaiting auth"
   },
   "permission": {
-    "title": "Confirmation required",
+    "title": "Authorization required",
     "write": "About to write file",
     "edit": "About to edit file",
     "bash": "About to run command",
-    "allow": "Allow",
+    "allow": "Allow once",
     "deny": "Deny",
-    "alwaysAllow": "Always allow (this session)"
+    "alwaysAllow": "Always allow this session"
   },
   "skills": {
     "title": "Skills",
@@ -339,7 +359,7 @@
     "default": "Default",
     "selectDirectory": "Select Directory...",
     "removeTitle": "Remove workspace",
-    "removeDescription": "Remove {{name}} from the workspace list? This won't delete any files on disk.",
+    "removeDescription": "Remove \"{{name}}\" from workspace list? Associated chat history will also be deleted. The folder itself is not affected.",
     "cancel": "Cancel",
     "remove": "Remove",
     "removeButtonTitle": "Remove workspace",
@@ -376,5 +396,13 @@
     "exportSuccess": "Exported {{count}} files",
     "importSuccess": "Restored {{count}} files",
     "resetSuccess": "SOUL reset to default"
+  },
+  "trustMode": {
+    "enableTooltip": "Enable trust mode",
+    "disableTooltip": "Trust mode active (click to disable)",
+    "confirmTitle": "Enable Trust Mode",
+    "confirmDescription": "Commands that normally require confirmation will run automatically. Dangerous commands remain blocked. Resets on conversation switch or app close.",
+    "cancel": "Cancel",
+    "enable": "Enable"
   }
 }
