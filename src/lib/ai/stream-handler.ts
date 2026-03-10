@@ -23,8 +23,8 @@ export async function handleAgentStream(
     () => ({
       streamingContent: fullContent,
       streamingReasoning: fullReasoning,
-      streamingToolCalls: [...toolCalls],
-      streamingParts: [...parts],
+      streamingToolCalls: toolCalls.map((tc) => ({ ...tc })),
+      streamingParts: parts.map((p) => (p.type === "tool" ? { ...p } : p)),
     }),
     onUpdate,
   );
