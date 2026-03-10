@@ -55,19 +55,26 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         console.warn("[workspaceStore] appDataDir() failed, using fallback:", e);
         defaultPath = "~/Documents";
       }
-      defaultWs = {
-        id: "default",
-        name: "Default",
-        path: defaultPath,
-        is_default: 1,
-        created_at: new Date().toISOString(),
-      };
-      await workspaceRepo.create({
-        id: defaultWs.id,
-        name: defaultWs.name,
-        path: defaultWs.path,
-        is_default: 1,
-      });
+      // Check if a workspace with this path already exists (but isn't marked as default)
+      const existing = await workspaceRepo.getByPath(defaultPath);
+      if (existing) {
+        await workspaceRepo.setDefault(existing.id);
+        defaultWs = { ...existing, is_default: 1 };
+      } else {
+        defaultWs = {
+          id: "default",
+          name: "Default",
+          path: defaultPath,
+          is_default: 1,
+          created_at: new Date().toISOString(),
+        };
+        await workspaceRepo.create({
+          id: defaultWs.id,
+          name: defaultWs.name,
+          path: defaultWs.path,
+          is_default: 1,
+        });
+      }
     }
 
     const workspaces = await workspaceRepo.getAll();
