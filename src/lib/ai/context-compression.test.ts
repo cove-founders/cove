@@ -126,7 +126,7 @@ describe("shouldCompress", () => {
         tokens_output: i % 2 === 1 ? 20000 : undefined,
       }),
     );
-    // Last assistant has tokens_input=80000, tokens_output=20000 → 100000+0 > 128000*0.60=76800
+    // Last assistant has tokens_input=80000, tokens_output=20000 → 100000+0 > 128000*0.40=51200
     expect(shouldCompress(msgs, 128_000)).toBe(true);
   });
 

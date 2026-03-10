@@ -3,8 +3,10 @@ import type { LanguageModel } from "ai";
 import type { Message } from "@/db/types";
 import compressionPromptTemplate from "@/prompts/context-compression.md?raw";
 
-/** Default threshold: compress when estimated tokens reach 60% of context window */
-const DEFAULT_THRESHOLD = 0.60;
+/** Default threshold: compress when estimated tokens reach 40% of context window.
+ * At 60% of 128K (76800 tokens), models like DeepSeek need ~20s prefill.
+ * 40% of 128K = 51200 tokens keeps first-token latency under ~10s. */
+const DEFAULT_THRESHOLD = 0.40;
 /** Ratio of context window to keep as recent messages */
 const DEFAULT_KEEP_RATIO = 0.4;
 /** Minimum number of messages before compression is considered (2 complete turns) */
