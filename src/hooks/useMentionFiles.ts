@@ -37,6 +37,13 @@ export function useMentionFiles(
 ): MentionFileEntry[] {
   const [entries, setEntries] = useState<MentionFileEntry[]>([]);
   const cacheRef = useRef<{ path: string; items: MentionFileEntry[] } | null>(null);
+  const prevPathRef = useRef<string | null>(null);
+
+  // Synchronous cache invalidation — runs before effects
+  if (workspacePath !== prevPathRef.current) {
+    prevPathRef.current = workspacePath;
+    cacheRef.current = null;
+  }
 
   useEffect(() => {
     if (!enabled || !workspacePath) {
@@ -51,6 +58,8 @@ export function useMentionFiles(
         applyFilter(cacheRef.current.items);
         return;
       }
+
+      setEntries([]);
 
       try {
         const raw = await invoke<WalkFileEntry[]>("walk_files", {

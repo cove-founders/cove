@@ -149,6 +149,79 @@ describe("useMentionFiles", () => {
     });
   });
 
+  it("invalidates cache and fetches new files when workspace path changes", async () => {
+    const NEW_ENTRIES = [
+      { name: "index.ts", path: "index.ts", isDir: false },
+      { name: "lib", path: "lib", isDir: true },
+    ];
+
+    let callCount = 0;
+    setupTauriMocks({
+      walk_files: () => {
+        callCount++;
+        return callCount === 1 ? MOCK_ENTRIES : NEW_ENTRIES;
+      },
+    });
+
+    const { result, rerender } = renderHook(
+      ({ path }) => useMentionFiles(path, "", true),
+      { initialProps: { path: "/workspace-a" } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.length).toBe(MOCK_ENTRIES.length);
+    });
+    expect(callCount).toBe(1);
+
+    rerender({ path: "/workspace-b" });
+
+    await waitFor(() => {
+      expect(result.current.length).toBe(NEW_ENTRIES.length);
+    });
+    expect(callCount).toBe(2);
+    expect(result.current[0].name).toBe("index.ts");
+  });
+
+  it("clears stale cache when workspace changes while disabled", async () => {
+    const OLD_ENTRIES = [
+      { name: "old.ts", path: "old.ts", isDir: false },
+    ];
+    const NEW_ENTRIES = [
+      { name: "new.ts", path: "new.ts", isDir: false },
+    ];
+
+    let callCount = 0;
+    setupTauriMocks({
+      walk_files: () => {
+        callCount++;
+        return callCount === 1 ? OLD_ENTRIES : NEW_ENTRIES;
+      },
+    });
+
+    const { result, rerender } = renderHook(
+      ({ path, enabled }) => useMentionFiles(path, "", enabled),
+      { initialProps: { path: "/workspace-a", enabled: true } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.length).toBe(1);
+      expect(result.current[0].name).toBe("old.ts");
+    });
+
+    // Disable (close popover) and switch workspace
+    rerender({ path: "/workspace-b", enabled: false });
+    expect(result.current).toEqual([]);
+
+    // Re-enable — should fetch new workspace files, not serve old cache
+    rerender({ path: "/workspace-b", enabled: true });
+
+    await waitFor(() => {
+      expect(result.current.length).toBe(1);
+      expect(result.current[0].name).toBe("new.ts");
+    });
+    expect(callCount).toBe(2);
+  });
+
   it("preserves isDir in entries", async () => {
     setupTauriMocks({
       walk_files: () => MOCK_ENTRIES,
