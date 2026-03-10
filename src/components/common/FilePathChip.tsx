@@ -79,12 +79,15 @@ export function FilePathChip({ path, label, compact }: FilePathChipProps) {
   }
 
   const handleClick = () => {
+    // Resolve bare filenames to absolute paths for reliable preview
+    const resolvedPath = bare && workspaceRoot ? `${workspaceRoot}/${path}` : path;
+
     if (kind === "unsupported") {
-      openExternal(path);
+      openExternal(resolvedPath);
     } else if (floatingPreview) {
-      floatingPreview.openPopup(path);
+      floatingPreview.openPopup(resolvedPath);
     } else {
-      openPreview(path);
+      openPreview(resolvedPath);
     }
   };
   const handleKeyDown = (e: KeyboardEvent) => {
