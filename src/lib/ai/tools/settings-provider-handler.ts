@@ -16,6 +16,9 @@ export interface ProviderInput {
   key?: string;
   value?: string;
   provider_type?: string;
+  provider_id?: string;
+  provider_name?: string;
+  protocol?: string;
   model_id?: string;
 }
 
@@ -49,6 +52,19 @@ function formatCapabilities(opt: ModelOption | undefined): string {
   return parts.join(", ");
 }
 
+function findProvider(input: ProviderInput): Provider | undefined {
+  const providers = useDataStore.getState().providers;
+  if (input.provider_id) return providers.find((p) => p.id === input.provider_id);
+  if (input.provider_type) return providers.find((p) => p.type === input.provider_type);
+  return undefined;
+}
+
+function providerNotFoundMsg(input: ProviderInput): string {
+  const providers = useDataStore.getState().providers;
+  const ref = input.provider_id ?? input.provider_type ?? "(none)";
+  return `Provider not found: ${ref}. Available: ${providers.map((p) => `${p.name} (${p.type}, id=${p.id})`).join(", ")}`;
+}
+
 export async function handleProvider(input: ProviderInput): Promise<string> {
   const providers = useDataStore.getState().providers;
 
@@ -56,43 +72,36 @@ export async function handleProvider(input: ProviderInput): Promise<string> {
     if (providers.length === 0) return "No providers configured.";
     const lines = providers.map(
       (p) =>
-        `- ${p.name} (type: ${p.type}, enabled: ${!!p.enabled}, api_key: ${maskApiKey(p.api_key)})`,
+        `- ${p.name} (type: ${p.type}, id: ${p.id}, enabled: ${!!p.enabled}, api_key: ${maskApiKey(p.api_key)})`,
     );
     return `Providers:\n${lines.join("\n")}`;
   }
 
-  const provider = input.provider_type
-    ? providers.find((p) => p.type === input.provider_type)
-    : null;
+  if (input.action === "create") return handleCreate(input);
+  if (input.action === "delete") return handleDelete(input);
+
+  const provider = findProvider(input);
 
   if (input.action === "validate") {
-    if (!provider) {
-      return `Provider not found: ${input.provider_type}. Available: ${providers.map((p) => p.type).join(", ")}`;
-    }
+    if (!provider) return providerNotFoundMsg(input);
     return handleValidate(provider);
   }
 
   if (input.action === "fetch_models") {
-    if (!provider) {
-      return `Provider not found: ${input.provider_type}. Available: ${providers.map((p) => p.type).join(", ")}`;
-    }
+    if (!provider) return providerNotFoundMsg(input);
     return handleFetchModels(provider);
   }
 
   if (input.action === "probe") {
-    if (!provider) {
-      return `Provider not found: ${input.provider_type}. Available: ${providers.map((p) => p.type).join(", ")}`;
-    }
+    if (!provider) return providerNotFoundMsg(input);
     if (!input.model_id) return "model_id is required for probe action.";
     return handleProbe(provider, input.model_id);
   }
 
   if (input.action === "get") {
-    if (!provider) {
-      return `Provider not found: ${input.provider_type}. Available: ${providers.map((p) => p.type).join(", ")}`;
-    }
+    if (!provider) return providerNotFoundMsg(input);
     if (!input.key)
-      return `${provider.name}: type=${provider.type}, enabled=${!!provider.enabled}, api_key=${maskApiKey(provider.api_key)}`;
+      return `${provider.name}: type=${provider.type}, id=${provider.id}, enabled=${!!provider.enabled}, api_key=${maskApiKey(provider.api_key)}`;
     if (input.key === "enabled") return `enabled: ${!!provider.enabled}`;
     if (input.key === "api_key")
       return `api_key: ${maskApiKey(provider.api_key)}`;
@@ -102,13 +111,53 @@ export async function handleProvider(input: ProviderInput): Promise<string> {
   }
 
   if (input.action === "set") {
-    if (!provider) {
-      return `Provider not found: ${input.provider_type}. Available: ${providers.map((p) => p.type).join(", ")}`;
-    }
+    if (!provider) return providerNotFoundMsg(input);
     return handleSet(provider, input);
   }
 
   return `Unknown action: ${input.action}`;
+}
+
+async function handleCreate(input: ProviderInput): Promise<string> {
+  const name = input.provider_name || "Custom Provider";
+  const protocol = input.protocol ?? "openai";
+  if (!["openai", "anthropic", "google"].includes(protocol)) {
+    return `Invalid protocol "${protocol}". Must be: openai, anthropic, google`;
+  }
+  const id = crypto.randomUUID();
+  const cfg: ProviderConfig = { protocol: protocol as ProviderConfig["protocol"] };
+  const now = new Date().toISOString();
+  const newProvider: Provider = {
+    id,
+    name,
+    type: "custom",
+    api_key: input.value,
+    base_url: input.key === "base_url" ? input.value : undefined,
+    config: JSON.stringify(cfg),
+    enabled: 1,
+    created_at: now,
+    updated_at: now,
+  };
+  await useDataStore.getState().createProvider({
+    id: newProvider.id,
+    name: newProvider.name,
+    type: newProvider.type,
+    api_key: newProvider.api_key,
+    base_url: newProvider.base_url,
+    config: newProvider.config,
+    enabled: newProvider.enabled,
+  });
+  return `Custom provider "${name}" created (id: ${id}, protocol: ${protocol}).`;
+}
+
+async function handleDelete(input: ProviderInput): Promise<string> {
+  if (!input.provider_id) return "provider_id is required for delete action.";
+  const provider = useDataStore.getState().providers.find((p) => p.id === input.provider_id);
+  if (!provider) return `Provider not found: ${input.provider_id}`;
+  if (provider.type !== "custom") return `Cannot delete built-in provider "${provider.name}". Only custom providers can be deleted.`;
+  await useDataStore.getState().deleteProvider(provider.id);
+  await emit("provider-disabled", { providerId: provider.id });
+  return `Custom provider "${provider.name}" deleted.`;
 }
 
 async function handleSet(
