@@ -181,6 +181,41 @@ describe("FilePathChip bare filename verification", () => {
   });
 });
 
+// ── Bare filename resolves to absolute path on click ──────────────────────
+
+describe("FilePathChip bare filename click resolution", () => {
+  it("passes absolute path to openPopup when bare filename is verified", async () => {
+    mockInvoke.mockResolvedValue({ size: 100, isDir: false });
+    const ctx = makeFloatingCtx();
+    renderWithFloatingCtx(<FilePathChip path="image.png" />, ctx);
+    await waitFor(() => {
+      expect(screen.getByRole("button")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button"));
+    expect(ctx.openPopup).toHaveBeenCalledWith("/workspace/image.png");
+  });
+
+  it("passes absolute path to openPreview when bare filename is verified (no provider)", async () => {
+    mockInvoke.mockResolvedValue({ size: 100, isDir: false });
+    render(<FilePathChip path="report.pdf" />);
+    await waitFor(() => {
+      expect(screen.getByRole("button")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockOpenPreview).toHaveBeenCalledWith("/workspace/report.pdf");
+  });
+
+  it("passes absolute path to openExternal for unsupported bare filename", async () => {
+    mockInvoke.mockResolvedValue({ size: 100, isDir: false });
+    render(<FilePathChip path="archive.zip" />);
+    await waitFor(() => {
+      expect(screen.getByRole("button")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockOpenExternal).toHaveBeenCalledWith("/workspace/archive.zip");
+  });
+});
+
 // ── FloatingPreviewContext integration ────────────────────────────────────────
 
 describe("FilePathChip — with FloatingPreviewContext provider", () => {
