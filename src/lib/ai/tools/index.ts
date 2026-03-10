@@ -3,7 +3,7 @@ import { readTool } from "./read";
 import { parseDocumentTool } from "./parse-document";
 import { writeTool } from "./write";
 import { editTool } from "./edit";
-import { bashTool } from "./bash";
+import { createBashTool } from "./bash";
 import { fetchUrlTool } from "./fetch-url";
 import { createSkillTool, createSkillResourceTool } from "./skill";
 import { writeSkillTool } from "./write-skill";
@@ -13,6 +13,7 @@ import { diagramTool } from "./diagram";
 import { createSpawnAgentTool } from "./spawn-agent";
 import { recallTool, recallDetailTool } from "./recall";
 import { settingsTool } from "./settings";
+import { createMeditateTool } from "./meditate";
 import { ALL_TOOL_INFOS } from "./tool-meta";
 import type { SubAgentContext } from "../sub-agent";
 
@@ -25,7 +26,7 @@ const TOOL_IMPLS: Record<string, AnyTool> = {
   parse_document: parseDocumentTool,
   write: writeTool,
   edit: editTool,
-  bash: bashTool,
+  // bash is created per-conversation via createBashTool — not a static singleton
   fetch_url: fetchUrlTool,
   cove_interpreter: jsInterpreterTool,
   write_skill: writeSkillTool,
@@ -45,6 +46,8 @@ export function getAgentTools(
   options?: {
     runtimeAvailability?: Record<string, boolean>;
     subAgentContext?: SubAgentContext;
+    conversationId?: string;
+    generateFn?: (prompt: string) => Promise<import("../soul-meditate").MeditateGenResult>;
   },
 ): ToolRecord {
   const tools: ToolRecord = {};
@@ -53,10 +56,16 @@ export function getAgentTools(
   for (const info of ALL_TOOL_INFOS) {
     if (info.category === "built-in") {
       // Factory-created tools
-      if (info.id === "skill") {
+      if (info.id === "bash") {
+        tools.bash = createBashTool(options?.conversationId ?? "");
+      } else if (info.id === "skill") {
         tools.skill = createSkillTool(enabledSkillNames);
       } else if (info.id === "skill_resource") {
         tools.skill_resource = createSkillResourceTool(enabledSkillNames);
+      } else if (info.id === "meditate") {
+        if (options?.generateFn) {
+          tools.meditate = createMeditateTool(options.generateFn);
+        }
       } else if (info.id === "spawn_agent") {
         // spawn_agent requires a SubAgentContext and depth headroom
         const ctx = options?.subAgentContext;
