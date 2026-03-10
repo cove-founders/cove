@@ -204,10 +204,11 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
       }
 
       // macOS: ⌘,  |  Windows/Linux: Ctrl+Shift+,
+      // Use e.code ("Comma") instead of e.key (",") because Shift changes e.key to "<" on standard keyboards
       const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
       if (
-        (isMac && e.metaKey && !e.shiftKey && e.key === ",") ||
-        (!isMac && e.ctrlKey && e.shiftKey && e.key === ",")
+        (isMac && e.metaKey && !e.shiftKey && e.code === "Comma") ||
+        (!isMac && e.ctrlKey && e.shiftKey && e.code === "Comma")
       ) {
         e.preventDefault();
         openSettingsWindow();
@@ -226,7 +227,7 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
           <GitBashBanner message={gitBashError} />
         </div>
       )}
-      <WindowControls onToggleSidebar={toggleLeft} onNewChat={handleNewChat} />
+      <WindowControls onToggleSidebar={toggleLeft} onNewChat={handleNewChat} onOpenSettings={openSettingsWindow} />
 
       {leftOpen ? (
         <div
