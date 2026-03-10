@@ -16,7 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useDataStore } from "@/stores/dataStore";
@@ -80,6 +79,8 @@ export function WorkspacePopover({
         <PopoverContent
           align="start"
           side="top"
+          collisionPadding={16}
+          sideOffset={8}
           className="w-[440px] rounded-xl border border-border bg-popover p-0 shadow-lg"
         >
           {/* Header */}
@@ -92,8 +93,7 @@ export function WorkspacePopover({
           </p>
 
           {/* Workspace list */}
-          <ScrollArea className="max-h-[280px]">
-            <div className="px-2 pb-1">
+          <div className="max-h-[200px] overflow-y-auto px-2 pb-1">
               {workspaces.map((ws) => {
                 const isActive = activeWorkspace?.id === ws.id;
                 return (
@@ -153,8 +153,7 @@ export function WorkspacePopover({
                   </div>
                 );
               })}
-            </div>
-          </ScrollArea>
+          </div>
 
           {/* Add directory button */}
           <div className="border-t border-border px-2 py-2">
