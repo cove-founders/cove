@@ -11,6 +11,12 @@ const DEFAULT_KEEP_RATIO = 0.4;
 const MIN_MESSAGES_FOR_COMPRESSION = 4;
 /** Max output tokens for the summary generation */
 const SUMMARY_MAX_TOKENS = 2048;
+/**
+ * Approximate token overhead for system prompt (~25K chars) + tool definitions (~20K chars).
+ * Applied only in the chars-based fallback path; the precise path (tokens_input from API)
+ * already includes this overhead.
+ */
+const FIXED_OVERHEAD_TOKENS = 10_000;
 
 /**
  * Estimate the input tokens for the next turn.
@@ -49,11 +55,13 @@ export function estimateNextTurnTokens(
   // parts is a JSON string containing text + tool calls/results and already
   // includes the assistant text stored in content, so use whichever is larger
   // to avoid double-counting.
+  // FIXED_OVERHEAD_TOKENS accounts for system prompt + tool definitions that
+  // are not reflected in message content but consume context window.
   const totalChars = messages.reduce(
     (sum, m) => sum + Math.max(m.content?.length ?? 0, m.parts?.length ?? 0),
     0,
   );
-  return Math.ceil((totalChars + newUserChars) / 4);
+  return Math.ceil((totalChars + newUserChars) / 4) + FIXED_OVERHEAD_TOKENS;
 }
 
 /**

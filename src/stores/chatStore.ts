@@ -198,10 +198,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const runMetrics = createAgentRunMetrics({ action: "send", conversationId, modelId });
 
     try {
+      const _sendT0 = performance.now();
       const modelOption = getModelOption(provider, modelId);
       const modelSupportsPdfNative = modelOption?.pdf_native === true;
       const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set);
       updatedMessages = compressed.messages;
+      const _sendT1 = performance.now();
 
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const modelSupportsVision = modelOption?.vision === true || modelOption?.image_in === true;
@@ -221,6 +223,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           }
         }
       }
+      const _sendT2 = performance.now();
+      console.log(`[perf] pre-stream: compress=${(_sendT1 - _sendT0).toFixed(0)}ms, toModelMessages+attachments=${(_sendT2 - _sendT1).toFixed(0)}ms`);
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `send:${provider.type}/${modelId}` },

@@ -36,28 +36,28 @@ describe("estimateNextTurnTokens", () => {
     expect(result).toBe(603);
   });
 
-  it("falls back to chars/4 when no token data", () => {
+  it("falls back to chars/4 + overhead when no token data", () => {
     const msgs: Message[] = [
       makeMessage({ role: "user", content: "a".repeat(400) }),
       makeMessage({ role: "assistant", content: "b".repeat(600) }),
     ];
-    // (400 + 600 + 20) / 4 = 255
+    // (400 + 600 + 20) / 4 + 10000 (overhead) = 10255
     const result = estimateNextTurnTokens(msgs, 20);
-    expect(result).toBe(255);
+    expect(result).toBe(10255);
   });
 
   it("handles empty messages array", () => {
     const result = estimateNextTurnTokens([], 100);
-    expect(result).toBe(25); // ceil(100/4)
+    expect(result).toBe(10025); // ceil(100/4) + 10000 overhead
   });
 
   it("handles assistant with zero tokens_input", () => {
     const msgs: Message[] = [
       makeMessage({ role: "assistant", content: "test", tokens_input: 0 }),
     ];
-    // Fallback: (4 + 50) / 4 = 14
+    // Fallback: (4 + 50) / 4 + 10000 = 10014
     const result = estimateNextTurnTokens(msgs, 50);
-    expect(result).toBe(14);
+    expect(result).toBe(10014);
   });
 
   it("uses parts length when larger than content (avoids double-counting)", () => {
@@ -81,9 +81,9 @@ describe("estimateNextTurnTokens", () => {
     const msgs: Message[] = [
       makeMessage({ role: "assistant", content: "hello", parts }),
     ];
-    // max(5, ~30) = ~30 chars → ~8 tokens, NOT (5+30)/4=9
+    // max(5, ~30) = ~30 chars → ~8 tokens + 10000 overhead
     const result = estimateNextTurnTokens(msgs, 0);
-    expect(result).toBe(Math.ceil(parts.length / 4));
+    expect(result).toBe(Math.ceil(parts.length / 4) + 10000);
   });
 
   it("uses chars-based fallback when summary message is present", () => {
