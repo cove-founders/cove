@@ -28,27 +28,38 @@ import type { UserContent } from "ai";
 
 export type { ToolCallInfo, DraftAttachment, MessagePart };
 
-/** Try to compress context if needed; returns { messages, summaryUpTo } */
-async function tryCompress(
-  msgs: Message[], convId: string, provider: Provider, modelId: string,
-  setFn: (s: Partial<ChatState>) => void,
-): Promise<{ messages: Message[]; summaryUpTo?: string }> {
-  const ss = useStreamStore.getState();
-  if (ss.getStream(convId)?.isCompressing) return { messages: msgs };
-  ss.updateStream(convId, { isCompressing: true, compressionNotice: null });
-  try {
+/** Per-conversation lock to prevent overlapping compression runs */
+const compressingConvIds = new Set<string>();
+
+/** Fire-and-forget: compress context after response completes so the NEXT turn benefits.
+ * Serialized per conversation — skips if a compression is already running for this convId.
+ * Scoped write — only updates store if the conversation is still active and message count
+ * hasn't changed (user hasn't sent another message while compressing). */
+function compressInBackground(
+  convId: string, provider: Provider, modelId: string,
+  getFn: () => ChatState, setFn: (s: Partial<ChatState>) => void,
+): void {
+  if (compressingConvIds.has(convId)) return;
+  compressingConvIds.add(convId);
+  const msgCountAtStart = getFn().messages.length;
+  void (async () => {
+    const msgs = await messageRepo.getByConversation(convId);
     const opt = getModelOption(provider, modelId);
     const ctxWin = opt?.context_window ?? 128_000;
     const result = await maybeCompressContext(msgs, convId, ctxWin, getModel(provider, modelId));
     if (result.compressed) {
-      ss.updateStream(convId, { compressionNotice: "compressed" });
-      setFn({ messages: result.messages, summaryUpTo: result.summaryUpTo ?? null });
-      return { messages: result.messages, summaryUpTo: result.summaryUpTo };
+      // Only update store if same conversation is active and no new messages were added
+      const activeId = useDataStore.getState().activeConversationId;
+      const currentCount = getFn().messages.length;
+      if (activeId === convId && currentCount === msgCountAtStart) {
+        console.log(`[context-compression] Background compress done: ${msgs.length} → ${result.messages.length} messages`);
+        setFn({ messages: result.messages, summaryUpTo: result.summaryUpTo ?? null });
+      } else {
+        console.log(`[context-compression] Background compress done but skipped store update (conversation moved on)`);
+      }
     }
-  } finally {
-    ss.updateStream(convId, { isCompressing: false });
-  }
-  return { messages: msgs };
+  })().catch((err) => console.warn("[context-compression] Background compress failed:", err))
+    .finally(() => compressingConvIds.delete(convId));
 }
 
 interface ChatState {
@@ -200,10 +211,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     try {
       const modelOption = getModelOption(provider, modelId);
       const modelSupportsPdfNative = modelOption?.pdf_native === true;
-      const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set);
-      updatedMessages = compressed.messages;
 
-      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
+      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: get().summaryUpTo ?? undefined });
       const modelSupportsVision = modelOption?.vision === true || modelOption?.image_in === true;
 
       if (readyAttachments.length > 0) {
@@ -221,6 +230,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           }
         }
       }
+      // Compression moved to post-response background — no longer blocks here
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `send:${provider.type}/${modelId}` },
@@ -239,6 +249,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
+      compressInBackground(conversationId, provider, modelId, get, set);
       messageRepo.getByConversation(conversationId).then((msgs) =>
         runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
       ).catch(() => {});
@@ -307,8 +318,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const runMetrics = createAgentRunMetrics({ action: "regenerate", conversationId, modelId });
 
     try {
-      const compressed = await tryCompress(remaining, conversationId, provider, modelId, set);
-      const modelMessages = toModelMessages(compressed.messages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
+      const modelMessages = toModelMessages(remaining, { summaryUpTo: get().summaryUpTo ?? undefined });
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `regenerate:${provider.type}/${modelId}` },
@@ -327,6 +337,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
+      compressInBackground(conversationId, provider, modelId, get, set);
       messageRepo.getByConversation(conversationId).then((msgs) =>
         runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
       ).catch(() => {});
@@ -382,9 +393,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const runMetrics = createAgentRunMetrics({ action: "edit_resend", conversationId, modelId });
 
     try {
-      const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set);
-      updatedMessages = compressed.messages;
-      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
+      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: get().summaryUpTo ?? undefined });
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `edit_resend:${provider.type}/${modelId}` },
@@ -403,6 +412,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
+      compressInBackground(conversationId, provider, modelId, get, set);
       messageRepo.getByConversation(conversationId).then((msgs) =>
         runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
       ).catch(() => {});
