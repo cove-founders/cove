@@ -377,69 +377,154 @@ fn test_file_outside_workspace_rejected() {
     assert!(r.is_err());
 }
 
-// --- officellm bridge session methods (dot-syntax, no self param) ---
+// --- officellm bridge regression tests (loads actual bridge source) ---
 
-#[test]
-fn test_officellm_bridge_session_dot_syntax() {
-    // Verify that bridge session methods work with dot-syntax (no self parameter).
-    // This tests the Lua bridge in isolation: create_session returns functions
-    // that accept (command, params) directly, not (self, command, params).
-    let dir = TempDir::new().unwrap();
-    // We can't test the full officellm stack without a running server,
-    // but we CAN verify the bridge loads and session methods are callable
-    // with the correct argument count by testing convert_params + invoke wiring.
-    let r = run(
-        dir.path().to_str().unwrap(),
-        r#"
-        -- Load the bridge source to test its structure
-        -- (officellm global won't be set because officellm_home is None,
-        --  so we inject the bridge manually for this test)
-        local bridge_loaded = type(officellm) == "nil"
-        return tostring(bridge_loaded)
-        "#,
-    );
-    assert!(r.error.is_none());
-    // officellm should NOT be available when officellm_home is None
-    assert_eq!(r.result, "true");
+/// Helper: set up a Lua VM with json + mock workspace.officellm, load the real bridge.
+fn run_with_bridge(test_code: &str) -> super::LuaExecutionResult {
+    use mlua::prelude::*;
+    use std::sync::{Arc, Mutex};
+
+    let lua = Lua::new();
+    super::register_json(&lua).unwrap();
+
+    // Mock workspace table with officellm that records calls
+    let ws = lua.create_table().unwrap();
+    let calls: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
+    let calls_clone = calls.clone();
+    ws.set(
+        "officellm",
+        lua.create_function(move |_lua, (cmd, params): (String, LuaValue)| {
+            let params_json = serde_json::to_string(&super::lua_value_to_json(&params))
+                .unwrap_or_default();
+            calls_clone.lock().unwrap().push((cmd, params_json));
+            Ok(r#"{"ok":true}"#.to_string())
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    lua.globals().set("workspace", ws).unwrap();
+
+    // Load the ACTUAL bridge source
+    lua.load(super::OFFICELLM_BRIDGE).exec().unwrap();
+
+    // Expose captured calls to test code
+    let calls_for_lua = calls.clone();
+    lua.globals()
+        .set(
+            "_test_get_calls",
+            lua.create_function(move |lua, ()| {
+                let locked = calls_for_lua.lock().unwrap();
+                let t = lua.create_table()?;
+                for (i, (cmd, params)) in locked.iter().enumerate() {
+                    let entry = lua.create_table()?;
+                    entry.set("cmd", cmd.as_str())?;
+                    entry.set("params", params.as_str())?;
+                    t.set(i + 1, entry)?;
+                }
+                Ok(t)
+            })
+            .unwrap(),
+        )
+        .unwrap();
+
+    let result: LuaResult<LuaValue> = lua.load(test_code).eval();
+    match result {
+        Ok(val) => super::LuaExecutionResult {
+            output: String::new(),
+            result: super::lua_value_to_string(&val),
+            error: None,
+            execution_ms: 0,
+        },
+        Err(e) => super::LuaExecutionResult {
+            output: String::new(),
+            result: String::new(),
+            error: Some(format!("{e}")),
+            execution_ms: 0,
+        },
+    }
 }
 
 #[test]
-fn test_officellm_bridge_convert_params_logic() {
-    // Test the camel_to_kebab and convert_params logic via inline Lua
-    // that mirrors the bridge's parameter conversion.
-    let dir = TempDir::new().unwrap();
-    let r = run(
-        dir.path().to_str().unwrap(),
+fn test_bridge_dot_syntax_call() {
+    // Regression: doc.call() must work with dot-syntax (no self param).
+    // If session methods had a `_` self param, the first real arg would be consumed.
+    let r = run_with_bridge(
         r#"
-        local function camel_to_kebab(s)
-            return s:gsub("%u", function(c) return "-" .. c:lower() end)
-        end
-        local function convert_params(params)
-            local out = {}
-            for key, val in pairs(params) do
-                local k = camel_to_kebab(key)
-                if type(val) == "boolean" then
-                    if val then out[k] = "" end
-                elseif val ~= nil then
-                    out[k] = tostring(val)
-                end
-            end
-            return out
-        end
-        local p = convert_params({ dryRun = true, fontSize = "14pt", disabled = false })
-        -- dryRun=true -> "dry-run"="" (bare flag)
-        -- fontSize="14pt" -> "font-size"="14pt"
-        -- disabled=false -> omitted
-        local keys = {}
-        for k, v in pairs(p) do
-            keys[#keys + 1] = k .. "=" .. v
-        end
-        table.sort(keys)
-        return table.concat(keys, ",")
+        local doc = officellm.open("/tmp/test.docx")
+        doc.call("addSlide", { title = "Hello" })
+        local calls = _test_get_calls()
+        -- calls[1] = open, calls[2] = addSlide
+        return calls[2].cmd
         "#,
     );
-    assert!(r.error.is_none());
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "addSlide");
+}
+
+#[test]
+fn test_bridge_dot_syntax_call_params() {
+    // Verify params are correctly converted (camelCase -> kebab-case) via real bridge.
+    let r = run_with_bridge(
+        r#"
+        local doc = officellm.open("/tmp/test.docx")
+        doc.call("setText", { fontSize = "14pt", dryRun = true, disabled = false })
+        local calls = _test_get_calls()
+        local params = json.decode(calls[2].params)
+        -- Build sorted key=value pairs for deterministic assertion
+        local kv = {}
+        for k, v in pairs(params) do kv[#kv+1] = k .. "=" .. v end
+        table.sort(kv)
+        return table.concat(kv, ",")
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
     assert_eq!(r.result, "dry-run=,font-size=14pt");
+}
+
+#[test]
+fn test_bridge_dot_syntax_save() {
+    // Regression: doc.save() must accept (path) directly, not (self, path).
+    let r = run_with_bridge(
+        r#"
+        local doc = officellm.open("/tmp/test.docx")
+        doc.save("/tmp/out.docx")
+        local calls = _test_get_calls()
+        local params = json.decode(calls[2].params)
+        return params.path
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "/tmp/out.docx");
+}
+
+#[test]
+fn test_bridge_dot_syntax_execute() {
+    // Regression: doc.execute() must accept (ops, options) directly.
+    let r = run_with_bridge(
+        r#"
+        local doc = officellm.open("/tmp/test.docx")
+        doc.execute(
+            {{ op = "addSlide", title = "S1" }},
+            { dryRun = true }
+        )
+        local calls = _test_get_calls()
+        -- execute call params should contain instructions-json
+        local params = json.decode(calls[2].params)
+        local instructions = json.decode(params["instructions-json"])
+        return instructions.version .. ":" .. tostring(instructions.dry_run)
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "1.0:true");
+}
+
+#[test]
+fn test_bridge_not_loaded_without_officellm_home() {
+    // officellm global should NOT exist when officellm_home is None
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), "return type(officellm)");
+    assert!(r.error.is_none());
+    assert_eq!(r.result, "nil");
 }
 
 // --- code/file exclusivity ---
