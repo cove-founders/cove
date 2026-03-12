@@ -118,16 +118,11 @@ function WorkspaceRootNode({
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
 
   // Collapse all folders whenever this workspace transitions from inactive → active.
-  // suppressAutoExpandRef prevents the selectedPath auto-expand effect (which shares
-  // activeWorkspaceId in its deps) from immediately re-expanding folders in the same
-  // post-render flush. Reset effect is declared first so it runs first.
   const prevActiveIdRef = useRef<string | undefined>(undefined);
-  const suppressAutoExpandRef = useRef(false);
   useEffect(() => {
     const isNowActive = activeWorkspaceId === workspace.id;
     if (isNowActive && prevActiveIdRef.current !== workspace.id) {
       setExpandedDirs(new Set());
-      suppressAutoExpandRef.current = true;
     }
     prevActiveIdRef.current = activeWorkspaceId;
   }, [activeWorkspaceId, workspace.id]);
@@ -199,14 +194,24 @@ function WorkspaceRootNode({
     });
   }, [workspaceRoot, expandedDirs, fileTreeShowHidden, initFolderOrder]);
 
+  // Keep activeWorkspaceId in a ref so the auto-expand effect can read the
+  // current value without listing it as a dependency — otherwise the effect
+  // would re-run on workspace activation and immediately re-expand the
+  // folders that the reset effect just collapsed.
+  const activeWsIdRef = useRef(activeWorkspaceId);
+  useEffect(() => { activeWsIdRef.current = activeWorkspaceId; });
+
+  // Auto-expand to reveal the selected file in the tree.
+  // Only fires when selectedPath actually changes (user clicked a file).
+  // Skips the initial mount so a previously-selected path doesn't re-expand
+  // folders when the workspace panel is opened.
+  const autoExpandMountedRef = useRef(false);
   useEffect(() => {
-    // If the workspace-activation reset just fired, skip this run to prevent
-    // selectedPath from immediately re-expanding the folders we just collapsed.
-    if (suppressAutoExpandRef.current) {
-      suppressAutoExpandRef.current = false;
+    if (!autoExpandMountedRef.current) {
+      autoExpandMountedRef.current = true;
       return;
     }
-    if (activeWorkspaceId !== workspace.id) return;
+    if (activeWsIdRef.current !== workspace.id) return;
     const focusDir = selectedPath ? dirOfPath(selectedPath) : null;
     if (!focusDir) return;
     setExpandedDirs((prev) => {
@@ -215,7 +220,10 @@ function WorkspaceRootNode({
       for (let i = 0; i < parts.length; i++) next.add(parts.slice(0, i + 1).join("/"));
       return next;
     });
-  }, [selectedPath, activeWorkspaceId, workspace.id]);
+    // activeWorkspaceId intentionally omitted — read via ref to avoid
+    // re-running on workspace-activation (which would undo the collapse reset).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPath, workspace.id]);
 
   useEffect(() => {
     if (!pendingExpandPath || activeWorkspaceId !== workspace.id) return;
