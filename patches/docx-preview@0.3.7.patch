@@ -1,0 +1,26 @@
+diff --git a/dist/docx-preview.js b/dist/docx-preview.js
+index 1234567..abcdefg 100644
+--- a/dist/docx-preview.js
++++ b/dist/docx-preview.js
+@@ -1109,7 +1109,7 @@
+             d._options = options;
+             d._parser = parser;
+             d._package = await OpenXmlPackage.load(blob, options);
+-            d.rels = await d._package.loadRelationships();
++            d.rels = (await d._package.loadRelationships()) ?? [];
+             await Promise.all(topLevelRels.map(rel => {
+                 const r = d.rels.find(x => x.type === rel.type) ?? rel;
+                 return d.loadRelationshipPart(r.target, r.type);
+diff --git a/dist/docx-preview.mjs b/dist/docx-preview.mjs
+index 1234567..abcdefg 100644
+--- a/dist/docx-preview.mjs
++++ b/dist/docx-preview.mjs
+@@ -1105,7 +1105,7 @@
+         d._options = options;
+         d._parser = parser;
+         d._package = await OpenXmlPackage.load(blob, options);
+-        d.rels = await d._package.loadRelationships();
++        d.rels = (await d._package.loadRelationships()) ?? [];
+         await Promise.all(topLevelRels.map(rel => {
+             const r = d.rels.find(x => x.type === rel.type) ?? rel;
+             return d.loadRelationshipPart(r.target, r.type);

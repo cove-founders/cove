@@ -10,11 +10,6 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // 使用已打补丁的，避免 DOCX 无 pgMar 时解构 pageMargins 测试
-      "docx-preview-sync": path.resolve(
-        __dirname,
-        "node_modules/docx-preview-sync/dist/docx-preview.esm.js",
-      ),
     },
   },
   clearScreen: false,

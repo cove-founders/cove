@@ -83,6 +83,8 @@ export function FilePreviewPanel() {
   const [draft, setDraft] = useState<string | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>("idle");
   const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
+  // When pure-JS DOCX renderer fails, fall back to UnsupportedFallback
+  const [docxRenderFailed, setDocxRenderFailed] = useState(false);
 
   // Refs for cleanup effect (stale closure avoidance)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,6 +131,7 @@ export function FilePreviewPanel() {
     setDraft(null);
     setAutoSaveStatus("idle");
     setAutoSaveError(null);
+    setDocxRenderFailed(false);
     isDirtyRef.current = false;
   }, [selectedPath]);
 
@@ -395,7 +398,19 @@ export function FilePreviewPanel() {
       return (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
           <PreviewFileHeader path={selectedPath} {...headerProps} />
-          <DocxViewer dataUrl={cached.dataUrl} className="flex-1" />
+          {docxRenderFailed ? (
+            <UnsupportedFallback
+              path={selectedPath}
+              workspaceRoot={workspaceRoot}
+              onOpenExternal={() => openExternally()}
+            />
+          ) : (
+            <DocxViewer
+              dataUrl={cached.dataUrl}
+              className="flex-1"
+              onRenderError={() => setDocxRenderFailed(true)}
+            />
+          )}
         </div>
       );
     }
