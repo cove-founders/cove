@@ -113,6 +113,17 @@ export const officeTool = tool({
         args: { workspaceRoot: activeWorkspace.path, code, timeoutMs: 30_000 },
       });
       if (result.error) return `Error: ${result.error}`;
+      // For save: compute the absolute path directly from args + workspaceRoot.
+      // This is reliable regardless of what OfficeLLM returns in its response,
+      // because Rust resolves the same path via ensure_inside_workspace_may_not_exist.
+      if (command === "save" && args?.path) {
+        const p = args.path;
+        const absPath = p.startsWith("/")
+          ? p.replace(/\/+/g, "/")
+          : `${activeWorkspace.path}/${p}`.replace(/\/+/g, "/");
+        const fileName = absPath.split("/").pop() ?? p;
+        return `已保存文档：[${fileName}](file://${absPath})\n完整路径：${absPath}`;
+      }
       return formatOfficellmOutput(command, result.output.trim());
     } catch (err) {
       return `office error: ${err instanceof Error ? err.message : String(err)}`;

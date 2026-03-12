@@ -1,4 +1,5 @@
-import { FolderOpen } from "lucide-react";
+import { useState } from "react";
+import { FolderOpen, AlertCircle } from "lucide-react";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getClassWithColor } from "file-icons-js";
 import { getFileExtension } from "@/lib/attachment-utils";
@@ -31,17 +32,28 @@ export function FileChip({ path, name }: FileChipProps) {
   // 仅取父目录最后一段，保持简洁
   const parentDir = path.split("/").slice(0, -1).pop() ?? "";
 
+  const [openErr, setOpenErr] = useState(false);
+  const [revealErr, setRevealErr] = useState(false);
+
+  const flashError = (setter: (v: boolean) => void) => {
+    setter(true);
+    setTimeout(() => setter(false), 2000);
+  };
+
   const handleOpenFile = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const fallback = () =>
+      openPath(path).catch((err) => {
+        console.error("[FileChip] openPath failed:", err);
+        flashError(setOpenErr);
+      });
     if (matchingApps.length > 0 && matchingApps[0]) {
       openPath(path, matchingApps[0].id).catch((err) => {
         console.error("[FileChip] openPath with app failed, fallback:", err);
-        openPath(path).catch(console.error);
+        fallback();
       });
     } else {
-      openPath(path).catch((err) => {
-        console.error("[FileChip] openPath failed:", err);
-      });
+      fallback();
     }
   };
 
@@ -49,6 +61,7 @@ export function FileChip({ path, name }: FileChipProps) {
     e.stopPropagation();
     revealItemInDir(path).catch((err) => {
       console.error("[FileChip] revealItemInDir failed:", err);
+      flashError(setRevealErr);
     });
   };
 
@@ -58,11 +71,15 @@ export function FileChip({ path, name }: FileChipProps) {
       <button
         type="button"
         onClick={handleOpenFile}
-        title={path}
+        title={openErr ? `无法打开：${path}` : path}
         className="inline-flex cursor-pointer items-center gap-1.5 px-2 py-0.5 transition-colors duration-150 hover:bg-background-tertiary hover:text-accent"
       >
-        <i className={`icon ${iconClass} shrink-0`} aria-hidden />
-        <span className="max-w-[200px] truncate">{name}</span>
+        {openErr ? (
+          <AlertCircle className="size-3.5 shrink-0 text-destructive" strokeWidth={1.5} />
+        ) : (
+          <i className={`icon ${iconClass} shrink-0`} aria-hidden />
+        )}
+        <span className={`max-w-[200px] truncate ${openErr ? "text-destructive" : ""}`}>{name}</span>
       </button>
 
       {/* 分隔线 */}
@@ -72,15 +89,16 @@ export function FileChip({ path, name }: FileChipProps) {
       <button
         type="button"
         onClick={handleRevealDir}
-        title={`在访达中显示: ${path}`}
+        title={revealErr ? `无法定位文件：${path}` : `在访达中显示: ${path}`}
         className="inline-flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors duration-150 hover:bg-background-tertiary hover:text-accent"
       >
-        <FolderOpen
-          className="size-3 shrink-0 text-muted-foreground"
-          strokeWidth={1.5}
-        />
-        <span className="max-w-[140px] truncate text-muted-foreground">
-          {parentDir}
+        {revealErr ? (
+          <AlertCircle className="size-3 shrink-0 text-destructive" strokeWidth={1.5} />
+        ) : (
+          <FolderOpen className="size-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+        )}
+        <span className={`max-w-[140px] truncate ${revealErr ? "text-destructive" : "text-muted-foreground"}`}>
+          {revealErr ? "找不到文件" : parentDir}
         </span>
       </button>
     </span>
