@@ -22,6 +22,10 @@ interface ChatHeaderProps {
   leftSidebarOpen: boolean;
 }
 
+// The header already has 24px of left offset (px-3 + ml-3). Add 184px more
+// when the sidebar is hidden so the title starts to the right of WindowControls.
+const HIDDEN_SIDEBAR_TITLE_PADDING_LEFT = 184;
+
 function TrustModeToggle({ conversationId }: { conversationId: string }) {
   const { t } = useTranslation();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -119,7 +123,7 @@ export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
         {/* 当前对话标题 */}
         <div
           className="ml-3 flex min-w-0 max-w-[50%] items-center transition-[padding] duration-300 ease-out"
-          style={{ paddingLeft: leftSidebarOpen ? 0 : 148 }}
+          style={{ paddingLeft: leftSidebarOpen ? 0 : HIDDEN_SIDEBAR_TITLE_PADDING_LEFT }}
         >
           <span className="truncate text-[13px] font-semibold text-foreground">
             {title}
