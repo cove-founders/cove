@@ -1,5 +1,5 @@
 // FILE_SIZE_EXCEPTION: FileTreePanel handles complex workspace file tree logic (navigation, search, context menus, drag-drop); scheduled for modular refactor.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
@@ -116,6 +116,16 @@ function WorkspaceRootNode({
   const [rootEntries, setRootEntries] = useState<ListDirEntry[] | null>(null);
   const [rootLoaded, setRootLoaded] = useState(false);
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
+
+  // Collapse all folders whenever this workspace transitions from inactive → active.
+  const prevActiveIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const isNowActive = activeWorkspaceId === workspace.id;
+    if (isNowActive && prevActiveIdRef.current !== workspace.id) {
+      setExpandedDirs(new Set());
+    }
+    prevActiveIdRef.current = activeWorkspaceId;
+  }, [activeWorkspaceId, workspace.id]);
   const [loadedChildren, setLoadedChildren] = useState<Record<string, ListDirEntry[]>>({});
   const [editingPath, setEditingPath] = useState<string | null>(null);
 
