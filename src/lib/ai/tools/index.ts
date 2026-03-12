@@ -1,8 +1,8 @@
 import type { Tool } from "ai";
 import { readTool } from "./read";
 import { parseDocumentTool } from "./parse-document";
-import { writeTool } from "./write";
-import { editTool } from "./edit";
+import { createWriteTool } from "./write";
+import { createEditTool } from "./edit";
 import { createBashTool } from "./bash";
 import { fetchUrlTool } from "./fetch-url";
 import { createSkillTool, createSkillResourceTool } from "./skill";
@@ -24,8 +24,7 @@ type AnyTool = Tool<any, any>;
 const TOOL_IMPLS: Record<string, AnyTool> = {
   read: readTool,
   parse_document: parseDocumentTool,
-  write: writeTool,
-  edit: editTool,
+  // write and edit are created per-call via factories to capture workspacePath
   // bash is created per-conversation via createBashTool — not a static singleton
   fetch_url: fetchUrlTool,
   cove_interpreter: interpreterTool,
@@ -48,6 +47,7 @@ export function getAgentTools(
     subAgentContext?: SubAgentContext;
     conversationId?: string;
     generateFn?: (prompt: string) => Promise<import("../soul-meditate").MeditateGenResult>;
+    workspacePath?: string;
   },
 ): ToolRecord {
   const tools: ToolRecord = {};
@@ -58,6 +58,10 @@ export function getAgentTools(
       // Factory-created tools
       if (info.id === "bash") {
         tools.bash = createBashTool(options?.conversationId ?? "");
+      } else if (info.id === "write") {
+        tools.write = createWriteTool(options?.workspacePath);
+      } else if (info.id === "edit") {
+        tools.edit = createEditTool(options?.workspacePath);
       } else if (info.id === "skill") {
         tools.skill = createSkillTool(enabledSkillNames);
       } else if (info.id === "skill_resource") {

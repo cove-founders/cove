@@ -25,8 +25,11 @@ import {
   FileUp,
   Link,
   Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { cn } from "@/lib/utils";
 import { useDataStore } from "@/stores/dataStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useLayoutStore } from "@/stores/layoutStore";
@@ -96,13 +99,15 @@ function WorkspaceRootNode({
   onRemove,
   searchQuery,
   onMatchCount,
+  isDefault = false,
 }: {
   workspace: Workspace;
   selectedEntries: string[];
-  onSelectFile: (e: React.MouseEvent, path: string, isDir: boolean, name: string) => void;
+  onSelectFile: (e: React.MouseEvent, path: string, isDir: boolean, name: string, workspaceRoot: string) => void;
   onRemove: () => void;
   searchQuery: string;
   onMatchCount: (id: string, count: number) => void;
+  isDefault?: boolean;
 }) {
   const { t } = useTranslation();
   const workspaceRoot = workspace.path;
@@ -283,11 +288,12 @@ function WorkspaceRootNode({
     });
   }, []);
 
-  // Wrap onSelectFile to also record which workspace root owns this selection
+  // Wrap onSelectFile to record which workspace root owns this selection (for preview panel)
+  // and pass workspaceRoot to the store per-entry (for AI context injection).
   const handleLocalSelectFile = useCallback(
     (e: React.MouseEvent, path: string, isDir: boolean, name: string) => {
       useFilePreviewStore.getState().setSelectedWorkspaceRoot(workspaceRoot);
-      onSelectFile(e, path, isDir, name);
+      onSelectFile(e, path, isDir, name, workspaceRoot);
     },
     [onSelectFile, workspaceRoot],
   );
@@ -474,15 +480,19 @@ function WorkspaceRootNode({
             <Link className="size-4" strokeWidth={1.5} />
             {t("explorer.copyAbsolutePath")}
           </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            variant="destructive"
-            className="gap-2 text-[13px]"
-            onClick={onRemove}
-          >
-            <Trash2 className="size-4" strokeWidth={1.5} />
-            {t("workspace.remove", "Remove")}
-          </ContextMenuItem>
+          {!isDefault && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                variant="destructive"
+                className="gap-2 text-[13px]"
+                onClick={onRemove}
+              >
+                <Trash2 className="size-4" strokeWidth={1.5} />
+                {t("workspace.remove", "Remove")}
+              </ContextMenuItem>
+            </>
+          )}
         </ContextMenuContent>
       </ContextMenu>
 
@@ -542,6 +552,8 @@ export function FileTreePanel() {
   const setSelected = useFilePreviewStore((s) => s.setSelected);
   const toggleSelected = useFilePreviewStore((s) => s.toggleSelected);
   const selectedEntries = useFilePreviewStore((s) => s.selectedEntries);
+  const fileTreeShowHidden = useLayoutStore((s) => s.fileTreeShowHidden);
+  const setFileTreeShowHidden = useLayoutStore((s) => s.setFileTreeShowHidden);
 
   const [removeTarget, setRemoveTarget] = useState<Workspace | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -562,6 +574,7 @@ export function FileTreePanel() {
     [selectedEntries],
   );
 
+  const defaultWorkspace = workspaces.find((w) => w.is_default === 1) ?? null;
   const realWorkspaces = workspaces.filter((w) => !w.is_default);
 
   const handleAddWorkspace = async () => {
@@ -579,11 +592,11 @@ export function FileTreePanel() {
   };
 
   const handleSelectFile = useCallback(
-    (e: React.MouseEvent, path: string, isDir: boolean, name: string) => {
+    (e: React.MouseEvent, path: string, isDir: boolean, name: string, workspaceRoot: string) => {
       if (e.metaKey || e.ctrlKey) {
-        toggleSelected(path, isDir, name);
+        toggleSelected(path, isDir, name, workspaceRoot);
       } else {
-        setSelected(path, isDir, name);
+        setSelected(path, isDir, name, workspaceRoot);
       }
     },
     [setSelected, toggleSelected],
@@ -603,6 +616,17 @@ export function FileTreePanel() {
             {t("sidebar.workspace", "Workspace")}
           </span>
           <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setFileTreeShowHidden(!fileTreeShowHidden)}
+              className={cn(
+                "rounded-md p-1 transition-colors hover:bg-background-tertiary",
+                fileTreeShowHidden ? "text-foreground hover:text-foreground" : "text-foreground-secondary hover:text-foreground",
+              )}
+              title={fileTreeShowHidden ? t("explorer.hideHidden", "Hide hidden files") : t("explorer.showHidden", "Show hidden files")}
+            >
+              {fileTreeShowHidden ? <Eye className="size-3.5" strokeWidth={1.5} /> : <EyeOff className="size-3.5" strokeWidth={1.5} />}
+            </button>
             <button
               type="button"
               onClick={() => setSearchOpen((v) => !v)}
@@ -632,23 +656,36 @@ export function FileTreePanel() {
         />
 
         <ScrollArea className="min-h-0 flex-1">
-          {realWorkspaces.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
-              <p className="text-[13px] text-foreground-tertiary">
-                {t("workspace.noWorkspaces", "No workspaces added")}
-              </p>
-              <button
-                type="button"
-                onClick={handleAddWorkspace}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-foreground-secondary hover:bg-background-tertiary hover:text-foreground"
-              >
-                <FolderPlus className="size-4" strokeWidth={1.5} />
-                {t("workspace.addFolder", "Add workspace folder")}
-              </button>
-            </div>
-          ) : (
-            <div className="pt-1 pb-2">
-              {realWorkspaces.map((ws) => (
+          <div className="pt-1 pb-2">
+            {/* Default workspace always pinned at top */}
+            {defaultWorkspace && (
+              <WorkspaceRootNode
+                key={defaultWorkspace.id}
+                workspace={defaultWorkspace}
+                selectedEntries={selectedEntryPaths}
+                onSelectFile={handleSelectFile}
+                onRemove={() => {}}
+                searchQuery={searchQuery}
+                onMatchCount={handleMatchCount}
+                isDefault
+              />
+            )}
+            {realWorkspaces.length === 0 && !defaultWorkspace ? (
+              <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+                <p className="text-[13px] text-foreground-tertiary">
+                  {t("workspace.noWorkspaces", "No workspaces added")}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleAddWorkspace}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-foreground-secondary hover:bg-background-tertiary hover:text-foreground"
+                >
+                  <FolderPlus className="size-4" strokeWidth={1.5} />
+                  {t("workspace.addFolder", "Add workspace folder")}
+                </button>
+              </div>
+            ) : (
+              realWorkspaces.map((ws) => (
                 <WorkspaceRootNode
                   key={ws.id}
                   workspace={ws}
@@ -658,9 +695,9 @@ export function FileTreePanel() {
                   searchQuery={searchQuery}
                   onMatchCount={handleMatchCount}
                 />
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </ScrollArea>
       </div>
 

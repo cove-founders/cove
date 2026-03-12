@@ -22,6 +22,8 @@ export interface SelectedEntry {
   path: string;
   isDir: boolean;
   name: string;
+  /** Absolute workspace root this entry belongs to */
+  workspaceRoot?: string;
 }
 
 interface FilePreviewState {
@@ -43,9 +45,9 @@ interface FilePreviewState {
 
   setWorkspaceRoot: (root: string | null) => void;
   /** Single click: replace selection with this item */
-  setSelected: (path: string | null, isDir?: boolean, name?: string) => void;
+  setSelected: (path: string | null, isDir?: boolean, name?: string, workspaceRoot?: string) => void;
   /** Cmd/Ctrl+Click: toggle item in multi-selection */
-  toggleSelected: (path: string, isDir: boolean, name: string) => void;
+  toggleSelected: (path: string, isDir: boolean, name: string, workspaceRoot?: string) => void;
   /** Set which workspace root owns the current selection */
   setSelectedWorkspaceRoot: (root: string | null) => void;
   setContent: (path: string, content: CachedContent) => void;
@@ -80,12 +82,12 @@ export const useFilePreviewStore = create<FilePreviewState>()((set) => ({
       pendingExpandPath: null,
     }),
 
-  setSelected: (path, isDir = false, name) =>
+  setSelected: (path, isDir = false, name, workspaceRoot) =>
     set((s) => ({
       selectedPath: path,
       selectedIsDir: isDir,
       selectedEntries: path != null
-        ? [{ path, isDir, name: name ?? path.split("/").pop() ?? path }]
+        ? [{ path, isDir, name: name ?? path.split("/").pop() ?? path, workspaceRoot }]
         : [],
       previewError: null,
       lastOpenedDirPath: path != null
@@ -93,12 +95,12 @@ export const useFilePreviewStore = create<FilePreviewState>()((set) => ({
         : s.lastOpenedDirPath,
     })),
 
-  toggleSelected: (path, isDir, name) =>
+  toggleSelected: (path, isDir, name, workspaceRoot) =>
     set((s) => {
       const exists = s.selectedEntries.some((e) => e.path === path);
       const nextEntries = exists
         ? s.selectedEntries.filter((e) => e.path !== path)
-        : [...s.selectedEntries, { path, isDir, name }];
+        : [...s.selectedEntries, { path, isDir, name, workspaceRoot }];
       // Preview the clicked item regardless
       return {
         selectedPath: path,

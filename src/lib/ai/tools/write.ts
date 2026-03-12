@@ -29,7 +29,13 @@ function resolvePath(workspaceRoot: string, filePath: string): string {
   return p.startsWith("/") ? p : `${workspaceRoot}/${p}`.replace(/\/+/g, "/");
 }
 
-export const writeTool = tool({
+/** Encode an absolute filesystem path for use inside a file:// URL. */
+function encodeFilePath(absPath: string): string {
+  return absPath.split("/").map((seg) => encodeURIComponent(seg)).join("/");
+}
+
+export function createWriteTool(workspacePath?: string) {
+  return tool({
   description:
     "Write or overwrite a file in the workspace. Can create Office documents (DOCX) via officellm. You must have read the file in this conversation before overwriting. Path is relative to workspace root.",
   inputSchema: z.object({
@@ -37,11 +43,10 @@ export const writeTool = tool({
     content: z.string().describe("Full new content of the file"),
   }),
   execute: async ({ filePath, content }) => {
-    const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
-    if (!activeWorkspace) {
+    const workspaceRoot = workspacePath ?? useWorkspaceStore.getState().activeWorkspace?.path;
+    if (!workspaceRoot) {
       return "请先在输入框上方选择工作区目录，再使用 write 工具。";
     }
-    const workspaceRoot = activeWorkspace.path;
     const conversationId = useDataStore.getState().activeConversationId;
     const resolvedPath = resolvePath(workspaceRoot, filePath);
 
@@ -70,7 +75,7 @@ export const writeTool = tool({
         });
         if (conversationId) recordRead(conversationId, resolvedPath);
         const officeFileName = absPath.split("/").pop() ?? filePath;
-        return `已创建 Office 文档：[${officeFileName}](file://${absPath})\n完整路径：${absPath}`;
+        return `已创建 Office 文档：[${officeFileName}](file://${encodeFilePath(absPath)})\n完整路径：${absPath}`;
       } catch (err) {
         if (isFsError(err)) {
           if (err.kind === "OutsideWorkspace") return "该路径不在当前工作区内。";
@@ -119,8 +124,8 @@ export const writeTool = tool({
       const fileName = filePath.split("/").pop() ?? filePath;
       const intro =
         existingRaw !== ""
-          ? `已写入 [${fileName}](file://${resolvedPath})。`
-          : `已创建并写入 [${fileName}](file://${resolvedPath})。`;
+          ? `已写入 [${fileName}](file://${encodeFilePath(resolvedPath)})。`
+          : `已创建并写入 [${fileName}](file://${encodeFilePath(resolvedPath)})。`;
       return `${intro}\n\n--- Diff ---\n${diff}`;
     } catch (err) {
       if (isFsError(err)) {
@@ -131,4 +136,8 @@ export const writeTool = tool({
       return `写入失败：${err instanceof Error ? err.message : String(err)}`;
     }
   },
-});
+  });
+}
+
+/** Backward-compat singleton (uses activeWorkspace at call time). */
+export const writeTool = createWriteTool();

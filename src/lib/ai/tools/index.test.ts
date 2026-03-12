@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 // Mock all tool modules to return simple placeholder objects
 vi.mock("./read", () => ({ readTool: { _id: "read" } }));
 vi.mock("./parse-document", () => ({ parseDocumentTool: { _id: "parse_document" } }));
-vi.mock("./write", () => ({ writeTool: { _id: "write" } }));
-vi.mock("./edit", () => ({ editTool: { _id: "edit" } }));
+vi.mock("./write", () => ({ createWriteTool: vi.fn(() => ({ _id: "write" })) }));
+vi.mock("./edit", () => ({ createEditTool: vi.fn(() => ({ _id: "edit" })) }));
 vi.mock("./bash", () => ({ createBashTool: vi.fn(() => ({ _id: "bash" })) }));
 vi.mock("./fetch-url", () => ({ fetchUrlTool: { _id: "fetch_url" } }));
 vi.mock("./office", () => ({ officeTool: { _id: "office" } }));

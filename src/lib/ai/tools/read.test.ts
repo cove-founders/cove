@@ -27,6 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockWsGetState.mockReturnValue({
     activeWorkspace: { id: "ws-1", path: "/workspace" },
+    workspaces: [{ id: "ws-1", path: "/workspace" }],
   } as ReturnType<typeof mockWsGetState>);
   mockDataGetState.mockReturnValue({
     activeConversationId: "conv-123",
@@ -66,6 +67,22 @@ describe("readTool", () => {
     expect(mockRecordRead).toHaveBeenCalledWith("conv-123", "/abs/path.ts");
   });
 
+  it("uses correct workspace root for absolute path in another workspace", async () => {
+    mockWsGetState.mockReturnValue({
+      activeWorkspace: { id: "ws-1", path: "/workspace-a" },
+      workspaces: [
+        { id: "ws-1", path: "/workspace-a" },
+        { id: "ws-2", path: "/workspace-b" },
+      ],
+    } as ReturnType<typeof mockWsGetState>);
+
+    await exec({ filePath: "/workspace-b/report.txt" });
+
+    expect(mockInvoke).toHaveBeenCalledWith("read_file", expect.objectContaining({
+      args: expect.objectContaining({ workspaceRoot: "/workspace-b" }),
+    }));
+  });
+
   it("skips recordRead when no activeConversationId", async () => {
     mockDataGetState.mockReturnValue({
       activeConversationId: null,
@@ -81,6 +98,7 @@ describe("readTool", () => {
   it("returns prompt when no active workspace", async () => {
     mockWsGetState.mockReturnValue({
       activeWorkspace: null,
+      workspaces: [],
     } as unknown as ReturnType<typeof mockWsGetState>);
 
     const result = await exec({ filePath: "a.ts" });

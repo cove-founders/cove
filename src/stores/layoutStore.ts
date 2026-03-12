@@ -228,7 +228,7 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
     });
     persistLayout(get());
   },
-  fileTreeShowHidden: true,
+  fileTreeShowHidden: false,
   setFileTreeShowHidden: (show) => {
     set({ fileTreeShowHidden: show });
     persistLayout(get());

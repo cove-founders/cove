@@ -217,7 +217,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: get().summaryUpTo ?? undefined });
       const modelSupportsVision = modelOption?.vision === true || modelOption?.image_in === true;
-      const wsPath = useWorkspaceStore.getState().activeWorkspace?.path;
+      const { workspaces, activeWorkspace } = useWorkspaceStore.getState();
+      const wsPath = activeWorkspace?.path;
+      const defaultWsPath = workspaces.find((w) => w.is_default === 1)?.path;
       const { selectedEntries, selectedWorkspaceRoot } = useFilePreviewStore.getState();
       const fetchBlock = await getFetchBlockForText(trimmedContent);
       const fileContextBlock = (wsPath || selectedWorkspaceRoot)
@@ -243,7 +245,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }
       // Compression moved to post-response background — no longer blocks here
 
-      const effectiveWsPath = selectedWorkspaceRoot ?? wsPath;
+      // If selected entries span multiple registered workspaces, fall back to the default
+      // workspace so the output has a predictable location.
+      const spansMultipleWorkspaces =
+        selectedEntries.length > 0 &&
+        new Set(selectedEntries.map((e) => e.workspaceRoot ?? selectedWorkspaceRoot ?? "__unknown__")).size > 1;
+
+      const effectiveWsPath = spansMultipleWorkspaces
+        ? (defaultWsPath ?? wsPath)
+        : (selectedEntries[0]?.workspaceRoot ?? selectedWorkspaceRoot ?? wsPath);
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: effectiveWsPath, abortSignal: abortController.signal, runMetrics, conversationId, labelBase: `send:${provider.type}/${modelId}` },
         { onUpdate: (s) => useStreamStore.getState().updateStream(conversationId, s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },

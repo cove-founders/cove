@@ -107,5 +107,12 @@ fn write_docx_via_officellm(
         return Err(FsError::Io(format!("officellm from-markdown failed: {msg}")));
     }
 
+    if !output.exists() {
+        let stdout = String::from_utf8_lossy(&child_out.stdout);
+        return Err(FsError::Io(format!(
+            "officellm exited successfully but did not create the output file. stdout: {stdout}"
+        )));
+    }
+
     Ok(())
 }

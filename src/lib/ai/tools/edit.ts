@@ -42,7 +42,8 @@ function countOccurrences(content: string, str: string): number {
   return n;
 }
 
-export const editTool = tool({
+export function createEditTool(workspacePath?: string) {
+  return tool({
   description:
     "Edit a file by replacing a string. You must have read the file in this conversation first. oldString must match exactly once (or use replaceAll for multiple). Use oldString empty to create a new file; use newString empty to delete the matched content.",
   inputSchema: z.object({
@@ -55,11 +56,10 @@ export const editTool = tool({
       .describe("If true, replace all occurrences; otherwise oldString must appear exactly once."),
   }),
   execute: async ({ filePath, oldString, newString, replaceAll }) => {
-    const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
-    if (!activeWorkspace) {
+    const workspaceRoot = workspacePath ?? useWorkspaceStore.getState().activeWorkspace?.path;
+    if (!workspaceRoot) {
       return "请先在输入框上方选择工作区目录，再使用 edit 工具。";
     }
-    const workspaceRoot = activeWorkspace.path;
     const conversationId = useDataStore.getState().activeConversationId;
     const resolvedPath = resolvePath(workspaceRoot, filePath);
 
@@ -142,4 +142,8 @@ export const editTool = tool({
       return `写入失败：${err instanceof Error ? err.message : String(err)}`;
     }
   },
-});
+  });
+}
+
+/** Backward-compat singleton (uses activeWorkspace at call time). */
+export const editTool = createEditTool();

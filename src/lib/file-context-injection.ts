@@ -28,23 +28,28 @@ function getExt(filePath: string): string {
   return dot !== -1 ? filePath.slice(dot + 1).toLowerCase() : "";
 }
 
+/** Encode an absolute filesystem path for use inside a file:// URL. */
+function encodeFilePath(absPath: string): string {
+  return absPath.split("/").map((seg) => encodeURIComponent(seg)).join("/");
+}
+
 /**
- * For absolute entry paths, find the most specific registered workspace that contains it.
- * For relative paths, use selectedWorkspaceRoot (the workspace where the user selected files)
- * if available, otherwise fall back to the active workspace.
+ * Resolve the workspace root for a single entry.
+ * Priority: entry.workspaceRoot > absolute-path registry lookup > selectedWorkspaceRoot > fallback.
  */
 function resolveWorkspaceRoot(
-  entryPath: string,
+  entry: { path: string; workspaceRoot?: string },
   fallback: string,
   selectedWorkspaceRoot?: string,
 ): string {
-  if (!entryPath.startsWith("/")) return selectedWorkspaceRoot ?? fallback;
+  if (entry.workspaceRoot) return entry.workspaceRoot;
+  if (!entry.path.startsWith("/")) return selectedWorkspaceRoot ?? fallback;
   const { workspaces } = useWorkspaceStore.getState();
   let bestLen = -1;
   let best = selectedWorkspaceRoot ?? fallback;
   for (const ws of workspaces) {
     const normalized = ws.path.endsWith("/") ? ws.path : ws.path + "/";
-    if ((entryPath === ws.path || entryPath.startsWith(normalized)) && ws.path.length > bestLen) {
+    if ((entry.path === ws.path || entry.path.startsWith(normalized)) && ws.path.length > bestLen) {
       bestLen = ws.path.length;
       best = ws.path;
     }
@@ -75,7 +80,7 @@ export async function buildFileContextBlock(
 
   await Promise.all(
     selectedEntries.map(async (entry) => {
-      const wsRoot = resolveWorkspaceRoot(entry.path, effectiveRoot, selectedWorkspaceRoot);
+      const wsRoot = resolveWorkspaceRoot(entry, effectiveRoot, selectedWorkspaceRoot);
       // Root workspace entry uses wsRoot as its path; normalize to "" for Tauri commands.
       const normalizedPath = entry.path === wsRoot ? "" : entry.path;
       const normalizedEntry = { ...entry, path: normalizedPath };
@@ -102,32 +107,40 @@ async function buildFileBlock(
   entry: SelectedEntry,
   workspaceRoot: string,
 ): Promise<string> {
-  const pathLabel = entry.path || entry.name;
-  const ext = getExt(pathLabel);
+  // Always use absolute path in labels so the AI can pass it back to the `read` tool
+  // and the tool can resolve the correct workspace root for cross-workspace reads.
+  const relPath = entry.path || entry.name;
+  const absPath = relPath.startsWith("/")
+    ? relPath
+    : `${workspaceRoot}/${relPath}`.replace(/\/+/g, "/");
+  const ext = getExt(relPath);
 
   if (OFFICE_EXTENSIONS.has(ext)) {
     const result = await invoke<ReadOfficeTextResult>("read_office_text", {
       args: { workspaceRoot, path: entry.path, maxChars: INLINE_THRESHOLD },
     });
+    const fileLink = `[${entry.name}](file://${encodeFilePath(absPath)})`;
     const suffix = result.truncated
-      ? "\n[content truncated — use `parse_document` tool for full text]"
+      ? `\n[content truncated — use \`read\` tool with absolute path "${absPath}" for full text]`
       : "";
-    return `[File: ${entry.name} at ${pathLabel} (${result.fileType})]\n\`\`\`\n${result.content}${suffix}\n\`\`\``;
+    return `[File: ${fileLink} (${result.fileType})]\n\`\`\`\n${result.content}${suffix}\n\`\`\``;
   }
 
   const content = await invoke<string>("read_file", {
     args: { workspaceRoot, path: entry.path, offset: 0, limit: READ_LIMIT },
   });
 
+  const fileLink = `[${entry.name}](file://${encodeFilePath(absPath)})`;
+
   if (content.length <= INLINE_THRESHOLD) {
-    return `[File: ${entry.name} at ${pathLabel}]\n\`\`\`\n${content}\n\`\`\``;
+    return `[File: ${fileLink}]\n\`\`\`\n${content}\n\`\`\``;
   }
 
   const truncated = content.slice(0, INLINE_THRESHOLD);
   return (
-    `[File: ${entry.name} at ${pathLabel} (truncated, ${content.length} chars)]\n` +
+    `[File: ${fileLink} (truncated, ${content.length} chars)]\n` +
     `\`\`\`\n${truncated}\n\`\`\`\n` +
-    `Full content available via \`read\` tool at: ${pathLabel}`
+    `[content truncated — use \`read\` tool with absolute path "${absPath}" for full text]`
   );
 }
 
@@ -139,9 +152,12 @@ async function buildDirBlock(
     args: { workspaceRoot, path: entry.path || "", includeHidden: false },
   });
 
-  const pathLabel = entry.path || entry.name;
+  const relPath = entry.path || entry.name;
+  const absPath = relPath.startsWith("/")
+    ? relPath
+    : `${workspaceRoot}/${relPath}`.replace(/\/+/g, "/");
   const listing = entries
     .map((e) => `  ${e.isDir ? "[dir]" : "[file]"} ${e.name}`)
     .join("\n");
-  return `[Directory: ${entry.name} at ${pathLabel}]\n${listing || "  (empty)"}`;
+  return `[Directory: ${entry.name} at ${absPath}]\n${listing || "  (empty)"}`;
 }

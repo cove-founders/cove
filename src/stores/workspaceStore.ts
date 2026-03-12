@@ -87,7 +87,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       } else {
         defaultWs = {
           id: "default",
-          name: "Default",
+          name: "默认工作区",
           path: defaultPath,
           is_default: 1,
           created_at: new Date().toISOString(),
