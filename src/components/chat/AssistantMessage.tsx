@@ -284,7 +284,7 @@ export const AssistantMessage = memo(function AssistantMessage({
 
         {!streaming && (copyContent || showTokens) && (
           <div className={cn(
-            "mb-2 -ml-1 min-h-8",
+            "mb-2 -ml-1 min-h-8 pointer-events-none",
             hasOrderedParts
               ? (orderedParts![orderedParts!.length - 1]?.type === "tool" && !(content?.trim() && copyContent !== content))
                 ? "mt-1" : "-mt-4"
@@ -292,7 +292,7 @@ export const AssistantMessage = memo(function AssistantMessage({
                 ? "mt-1" : "-mt-4",
           )}>
             {messageHovered && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 pointer-events-auto">
                 {copyContent && (
                   <>
                     <ActionButton
