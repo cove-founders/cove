@@ -25,4 +25,4 @@ For full API reference, load resource: `cove-core: resources/lua-reference.md`
 ### cove_interpreter vs bash lua
 
 - **cove_interpreter** — sandboxed, workspace-scoped. Default choice for computation and data processing.
-- **bash `lua`** — unsandboxed. Only when script needs `require`, `os.execute`, or runs outside workspace.
+- **bash `lua`** — unsandboxed, bundled sidecar binary (Lua 5.4). Available as `lua` in bash (on PATH). Use `lua -e "..."` for one-liners or `lua script.lua` for files. Only when script needs `require`, `os.execute`, or runs outside workspace.

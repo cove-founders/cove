@@ -30,8 +30,10 @@ for arg in "$@"; do
   esac
 done
 
+WORKSPACE_TARGET="$PROJECT_DIR/src-tauri/target"
+
 echo "Building cove-lua ($PROFILE) for $TARGET_TRIPLE ..."
-cargo build --manifest-path "$CRATE_DIR/Cargo.toml" --profile "$PROFILE"
+cargo build --manifest-path "$CRATE_DIR/Cargo.toml" --target-dir "$WORKSPACE_TARGET/cove-lua" --profile "$PROFILE"
 
 # Determine binary name
 EXT=""
@@ -39,7 +41,7 @@ if [[ "$TARGET_TRIPLE" == *"windows"* ]]; then
   EXT=".exe"
 fi
 
-SRC="$CRATE_DIR/target/$PROFILE_DIR/lua${EXT}"
+SRC="$WORKSPACE_TARGET/cove-lua/$PROFILE_DIR/lua${EXT}"
 DEST="$BINARY_DIR/lua-${TARGET_TRIPLE}${EXT}"
 
 mkdir -p "$BINARY_DIR"

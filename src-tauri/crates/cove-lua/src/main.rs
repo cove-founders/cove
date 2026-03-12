@@ -18,7 +18,7 @@ fn run(args: &[String]) -> i32 {
 
     match args[1].as_str() {
         "-v" | "--version" => {
-            println!("Lua 5.4 (cove-lua via mlua)");
+            println!("Lua 5.4 (cove-lua, minimal CLI via mlua)");
             0
         }
         "-e" => {
