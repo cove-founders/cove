@@ -108,7 +108,6 @@ function WorkspaceRootNode({
   const workspaceRoot = workspace.path;
   const fileTreeShowHidden = useLayoutStore((s) => s.fileTreeShowHidden);
   const selectedPath = useFilePreviewStore((s) => s.selectedPath);
-  const lastOpenedDirPath = useFilePreviewStore((s) => s.lastOpenedDirPath);
   const pendingExpandPath = useFilePreviewStore((s) => s.pendingExpandPath);
   const setPendingExpandPath = useFilePreviewStore((s) => s.setPendingExpandPath);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspace?.id);
@@ -187,7 +186,9 @@ function WorkspaceRootNode({
 
   useEffect(() => {
     if (activeWorkspaceId !== workspace.id) return;
-    const focusDir = selectedPath ? dirOfPath(selectedPath) : lastOpenedDirPath;
+    // Only auto-expand when user explicitly selects a file — never on lastOpenedDirPath,
+    // so that re-entering a workspace always shows folders collapsed by default.
+    const focusDir = selectedPath ? dirOfPath(selectedPath) : null;
     if (!focusDir) return;
     setExpandedDirs((prev) => {
       const next = new Set(prev);
@@ -195,7 +196,7 @@ function WorkspaceRootNode({
       for (let i = 0; i < parts.length; i++) next.add(parts.slice(0, i + 1).join("/"));
       return next;
     });
-  }, [selectedPath, lastOpenedDirPath, activeWorkspaceId, workspace.id]);
+  }, [selectedPath, activeWorkspaceId, workspace.id]);
 
   useEffect(() => {
     if (!pendingExpandPath || activeWorkspaceId !== workspace.id) return;
