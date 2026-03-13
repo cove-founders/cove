@@ -179,7 +179,7 @@ export function FilePreviewPanel() {
         </div>
         <ScrollArea className="min-h-0 flex-1 p-1.5">
           {mdViewMode === "preview" ? (
-            <MarkdownContent source={cached.text} className="text-[14px]" />
+            <MarkdownContent source={cached.text} className="text-[14px]" basePath={selectedPath.substring(0, selectedPath.lastIndexOf("/"))} />
           ) : (
             <CodeViewer path={selectedPath} code={cached.text} className="file-preview-code" />
           )}

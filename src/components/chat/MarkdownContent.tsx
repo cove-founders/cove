@@ -1,11 +1,12 @@
 import "katex/dist/katex.min.css";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import type { Components } from "react-markdown";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { CodeBlock, reactNodeToDisplayString } from "./CodeBlock";
 import { detectPreviewableFilePath } from "@/lib/detect-file-path";
 import { resolveFilePathsFromContext } from "@/lib/resolve-file-paths";
@@ -14,83 +15,111 @@ import { FilePathChip } from "@/components/common/FilePathChip";
 const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath];
 const rehypePluginsBase = [rehypeKatex];
 
-const markdownComponents: Components = {
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-  h1: ({ children }) => <h1 className="mb-2 mt-4 text-xl font-semibold">{children}</h1>,
-  h2: ({ children }) => <h2 className="mb-2 mt-3 text-lg font-semibold">{children}</h2>,
-  h3: ({ children }) => <h3 className="mb-1.5 mt-2 text-base font-semibold">{children}</h3>,
-  ul: ({ children }) => <ul className="mb-2 list-disc pl-6 [&>li]:my-1">{children}</ul>,
-  ol: ({ children }) => <ol className="mb-2 list-decimal pl-6 [&>li]:my-1">{children}</ol>,
-  blockquote: ({ children }) => (
-    <blockquote className="border-l-4 border-border pl-3 my-2 text-muted-foreground">
-      {children}
-    </blockquote>
-  ),
-  table: ({ children }) => (
-    <div className="my-3 overflow-x-auto">
-      <table className="w-full border-collapse text-[14px]">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead className="bg-background-tertiary">{children}</thead>,
-  th: ({ children }) => (
-    <th className="border border-border px-2 py-1.5 text-left font-medium">{children}</th>
-  ),
-  td: ({ children }) => <td className="border border-border px-2 py-1.5">{children}</td>,
-  tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-  pre: CodeBlock as unknown as Components["pre"],
-  code: ({ className, children, ...props }) => {
-    const isInline = !className;
-    const safeChildren =
-      typeof children === "string" ? children : reactNodeToDisplayString(children ?? "");
-    if (isInline) {
-      const filePath = detectPreviewableFilePath(safeChildren);
+function normalizePath(path: string): string {
+  const parts = path.split("/");
+  const normalized: string[] = [];
+  for (const part of parts) {
+    if (part === "..") {
+      normalized.pop();
+    } else if (part !== "." && part !== "") {
+      normalized.push(part);
+    }
+  }
+  return (path.startsWith("/") ? "/" : "") + normalized.join("/");
+}
+
+function resolveImageSrc(src: string, basePath?: string): string {
+  if (/^(https?:\/\/|data:|#)/.test(src)) return src;
+  if (!basePath) return src;
+  if (src.startsWith("/")) return convertFileSrc(src);
+  return convertFileSrc(normalizePath(basePath + "/" + src));
+}
+
+function createMarkdownComponents(basePath?: string): Components {
+  return {
+    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+    h1: ({ children }) => <h1 className="mb-2 mt-4 text-xl font-semibold">{children}</h1>,
+    h2: ({ children }) => <h2 className="mb-2 mt-3 text-lg font-semibold">{children}</h2>,
+    h3: ({ children }) => <h3 className="mb-1.5 mt-2 text-base font-semibold">{children}</h3>,
+    ul: ({ children }) => <ul className="mb-2 list-disc pl-6 [&>li]:my-1">{children}</ul>,
+    ol: ({ children }) => <ol className="mb-2 list-decimal pl-6 [&>li]:my-1">{children}</ol>,
+    blockquote: ({ children }) => (
+      <blockquote className="border-l-4 border-border pl-3 my-2 text-muted-foreground">
+        {children}
+      </blockquote>
+    ),
+    table: ({ children }) => (
+      <div className="my-3 overflow-x-auto">
+        <table className="w-full border-collapse text-[14px]">{children}</table>
+      </div>
+    ),
+    thead: ({ children }) => <thead className="bg-background-tertiary">{children}</thead>,
+    th: ({ children }) => (
+      <th className="border border-border px-2 py-1.5 text-left font-medium">{children}</th>
+    ),
+    td: ({ children }) => <td className="border border-border px-2 py-1.5">{children}</td>,
+    tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+    pre: CodeBlock as unknown as Components["pre"],
+    code: ({ className, children, ...props }) => {
+      const isInline = !className;
+      const safeChildren =
+        typeof children === "string" ? children : reactNodeToDisplayString(children ?? "");
+      if (isInline) {
+        const filePath = detectPreviewableFilePath(safeChildren);
+        if (filePath) {
+          return <FilePathChip path={filePath} compact />;
+        }
+        return (
+          <code
+            className="rounded bg-background-tertiary px-1 py-0.5 font-mono text-[13px]"
+            {...props}
+          >
+            {safeChildren}
+          </code>
+        );
+      }
+      return <code {...props}>{safeChildren}</code>;
+    },
+    strong: ({ children }) => {
+      const text = typeof children === "string" ? children : reactNodeToDisplayString(children ?? "");
+      const filePath = detectPreviewableFilePath(text);
       if (filePath) {
         return <FilePathChip path={filePath} compact />;
       }
-      return (
-        <code
-          className="rounded bg-background-tertiary px-1 py-0.5 font-mono text-[13px]"
-          {...props}
-        >
-          {safeChildren}
-        </code>
-      );
-    }
-    return <code {...props}>{safeChildren}</code>;
-  },
-  strong: ({ children }) => {
-    const text = typeof children === "string" ? children : reactNodeToDisplayString(children ?? "");
-    const filePath = detectPreviewableFilePath(text);
-    if (filePath) {
-      return <FilePathChip path={filePath} compact />;
-    }
-    return <strong>{children}</strong>;
-  },
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-brand hover:underline"
-    >
-      {children}
-    </a>
-  ),
-  span: ({ className, children, ...props }: { className?: string; children?: React.ReactNode }) => {
-    if (className?.includes("streaming-cursor-placeholder")) {
-      return (
-        <span className="cursor-blink ml-0.5 inline-block h-4 w-0.5 bg-brand align-middle" aria-hidden />
-      );
-    }
-    return <span className={className} {...props}>{children}</span>;
-  },
-};
+      return <strong>{children}</strong>;
+    },
+    img: ({ src, alt }) => {
+      if (!src) return null;
+      return <img src={resolveImageSrc(src, basePath)} alt={alt ?? ""} className="max-w-full rounded" loading="lazy" />;
+    },
+    a: ({ href, children }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-brand hover:underline"
+      >
+        {children}
+      </a>
+    ),
+    span: ({ className, children, ...props }: { className?: string; children?: React.ReactNode }) => {
+      if (className?.includes("streaming-cursor-placeholder")) {
+        return (
+          <span className="cursor-blink ml-0.5 inline-block h-4 w-0.5 bg-brand align-middle" aria-hidden />
+        );
+      }
+      return <span className={className} {...props}>{children}</span>;
+    },
+  };
+}
 
 export interface MarkdownContentProps {
   source: string;
   className?: string;
   /** 流式时在文末渲染打字机光标（紧跟文字） */
   trailingCursor?: boolean;
+  /** Directory containing the markdown file, used to resolve relative image paths */
+  basePath?: string;
 }
 
 /**
@@ -98,12 +127,19 @@ export interface MarkdownContentProps {
  * Only re-parses when the settled text actually changes — i.e. when a new
  * `\n` enters the typewriter output — not on every frame.
  */
-const SettledMarkdown = React.memo(function SettledMarkdown({ source }: { source: string }) {
+const SettledMarkdown = React.memo(function SettledMarkdown({
+  source,
+  basePath,
+}: {
+  source: string;
+  basePath?: string;
+}) {
+  const components = useMemo(() => createMarkdownComponents(basePath), [basePath]);
   return (
     <ReactMarkdown
       remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePluginsBase}
-      components={markdownComponents as Components}
+      components={components}
       skipHtml
     >
       {source}
@@ -142,7 +178,7 @@ function sanitizeInvalidHtmlLikeTags(source: string): string {
 
 import { cn } from "@/lib/utils";
 
-export function MarkdownContent({ source, className, trailingCursor }: MarkdownContentProps) {
+export function MarkdownContent({ source, className, trailingCursor, basePath }: MarkdownContentProps) {
   const normalizedSource = resolveFilePathsFromContext(
     sanitizeInvalidHtmlLikeTags(normalizeEscapedMarkdown(source)),
   );
@@ -164,6 +200,8 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
       });
     }
   }, [hasVisibleContent, source, normalizedSource, trailingCursor]);
+
+  const mdComponents = useMemo(() => createMarkdownComponents(basePath), [basePath]);
 
   if (!hasVisibleContent) return null;
 
@@ -192,7 +230,7 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
 
       return (
         <div className={wrapperCls} data-md>
-          <SettledMarkdown source={settled} />
+          <SettledMarkdown source={settled} basePath={basePath} />
           {pending ? (
             <p className="mb-0 last:mb-0 break-words">
               {pending}
@@ -222,7 +260,7 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePluginsBase}
-        components={markdownComponents as Components}
+        components={mdComponents}
         skipHtml
       >
         {normalizedSource}
