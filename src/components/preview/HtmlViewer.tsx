@@ -28,16 +28,27 @@ function loadHtmlImageDataUrl(
   basePath: string,
   workspaceRoot?: string,
 ): Promise<string> {
-  if (src.startsWith("/")) {
-    return invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", {
-      args: { path: src },
+  const insideWorkspace = workspaceRoot && basePath.startsWith(workspaceRoot);
+
+  if (insideWorkspace) {
+    let relativePath: string;
+    if (src.startsWith("/")) {
+      if (!src.startsWith(workspaceRoot + "/") && src !== workspaceRoot) {
+        return Promise.reject(new Error("Image path outside workspace"));
+      }
+      relativePath = src.slice(workspaceRoot.length).replace(/^\//, "");
+    } else {
+      const dirRelative = basePath.slice(workspaceRoot.length).replace(/^\//, "");
+      relativePath = normalizePath((dirRelative ? dirRelative + "/" : "") + src);
+    }
+    return invoke<{ dataUrl: string }>("read_file_as_data_url", {
+      args: { workspaceRoot, path: relativePath },
     }).then((r) => r.dataUrl);
   }
-  const relativePath = basePath.startsWith(workspaceRoot ?? "")
-    ? normalizePath((basePath.slice(workspaceRoot?.length ?? 0).replace(/^\//, "") + "/" + src).replace(/^\//, ""))
-    : src;
-  return invoke<{ dataUrl: string }>("read_file_as_data_url", {
-    args: { workspaceRoot: workspaceRoot ?? basePath, path: relativePath },
+
+  const absPath = src.startsWith("/") ? src : normalizePath(basePath + "/" + src);
+  return invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", {
+    args: { path: absPath },
   }).then((r) => r.dataUrl);
 }
 

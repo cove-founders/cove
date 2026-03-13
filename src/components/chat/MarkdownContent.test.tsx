@@ -1,10 +1,20 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, waitFor } from "@testing-library/react";
 
 vi.mock("katex/dist/katex.min.css", () => ({}));
+
+// Use a component mock that renders img tags so we can test image resolution
 vi.mock("react-markdown", () => ({
-  default: ({ children }: { children: string }) => <p>{children}</p>,
+  default: ({ children, components }: { children: string; components?: Record<string, unknown> }) => {
+    // If components.img exists and source contains markdown image syntax, render through it
+    const imgMatch = children?.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+    if (imgMatch && components?.img) {
+      const ImgComponent = components.img as React.FC<{ src: string; alt: string }>;
+      return <div><ImgComponent src={imgMatch[2]} alt={imgMatch[1]} /></div>;
+    }
+    return <p>{children}</p>;
+  },
 }));
 vi.mock("remark-gfm", () => ({ default: () => {} }));
 vi.mock("remark-breaks", () => ({ default: () => {} }));
@@ -24,11 +34,16 @@ vi.mock("@/components/common/FilePathChip", () => ({
   FilePathChip: ({ path }: { path: string }) => <span>{path}</span>,
 }));
 
+const mockInvoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
+  invoke: (...args: unknown[]) => mockInvoke(...args),
 }));
 
 import { MarkdownContent, computeMarkdownBasePath } from "./MarkdownContent";
+
+beforeEach(() => {
+  mockInvoke.mockReset();
+});
 
 const LONG_URL = "https://example.com/" + "a".repeat(400);
 
@@ -97,5 +112,72 @@ describe("computeMarkdownBasePath", () => {
 
   it("handles deeply nested relative path", () => {
     expect(computeMarkdownBasePath("a/b/c/file.md", "/ws")).toBe("/ws/a/b/c");
+  });
+});
+
+describe("image resolution security", () => {
+  it("workspace file with relative image uses workspace-gated command", async () => {
+    mockInvoke.mockResolvedValue({ dataUrl: "data:image/png;base64,abc" });
+    render(
+      <MarkdownContent
+        source="![photo](img.png)"
+        basePath="/workspace/docs"
+        workspaceRoot="/workspace"
+      />,
+    );
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("read_file_as_data_url", {
+        args: { workspaceRoot: "/workspace", path: "docs/img.png" },
+      });
+    });
+  });
+
+  it("workspace file with absolute image outside workspace is rejected", async () => {
+    mockInvoke.mockResolvedValue({ dataUrl: "data:image/png;base64,abc" });
+    render(
+      <MarkdownContent
+        source="![evil](/etc/hosts)"
+        basePath="/workspace/docs"
+        workspaceRoot="/workspace"
+      />,
+    );
+    // Should NOT call any invoke for /etc/hosts
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "read_absolute_file_as_data_url",
+      expect.anything(),
+    );
+  });
+
+  it("absolute file outside workspace with relative image uses read_absolute", async () => {
+    mockInvoke.mockResolvedValue({ dataUrl: "data:image/png;base64,abc" });
+    render(
+      <MarkdownContent
+        source="![photo](foo.png)"
+        basePath="/Users/me/docs"
+        workspaceRoot="/workspace"
+      />,
+    );
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("read_absolute_file_as_data_url", {
+        args: { path: "/Users/me/docs/foo.png" },
+      });
+    });
+  });
+
+  it("workspace root-level README with relative image resolves correctly", async () => {
+    mockInvoke.mockResolvedValue({ dataUrl: "data:image/png;base64,abc" });
+    render(
+      <MarkdownContent
+        source="![logo](logo.png)"
+        basePath="/workspace"
+        workspaceRoot="/workspace"
+      />,
+    );
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("read_file_as_data_url", {
+        args: { workspaceRoot: "/workspace", path: "logo.png" },
+      });
+    });
   });
 });
