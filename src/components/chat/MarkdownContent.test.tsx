@@ -165,6 +165,22 @@ describe("image resolution security", () => {
     });
   });
 
+  it("sibling-prefix path is NOT treated as inside workspace", async () => {
+    mockInvoke.mockResolvedValue({ dataUrl: "data:image/png;base64,abc" });
+    render(
+      <MarkdownContent
+        source="![img](photo.png)"
+        basePath="/Users/me/code/cove-docs"
+        workspaceRoot="/Users/me/code/cove"
+      />,
+    );
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("read_absolute_file_as_data_url", {
+        args: { path: "/Users/me/code/cove-docs/photo.png" },
+      });
+    });
+  });
+
   it("workspace root-level README with relative image resolves correctly", async () => {
     mockInvoke.mockResolvedValue({ dataUrl: "data:image/png;base64,abc" });
     render(

@@ -44,7 +44,8 @@ function loadImageDataUrl(
   basePath: string,
   workspaceRoot?: string,
 ): Promise<string> {
-  const insideWorkspace = workspaceRoot && basePath.startsWith(workspaceRoot);
+  const insideWorkspace = workspaceRoot &&
+    (basePath === workspaceRoot || basePath.startsWith(workspaceRoot + "/"));
 
   if (insideWorkspace) {
     let relativePath: string;
