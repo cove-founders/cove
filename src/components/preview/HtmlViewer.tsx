@@ -13,7 +13,35 @@ function getBaseDir(filePath: string): string {
   return idx >= 0 ? filePath.substring(0, idx) : "";
 }
 
-async function resolveLocalImages(html: string, basePath: string): Promise<string> {
+function normalizePath(path: string): string {
+  const parts = path.split("/");
+  const normalized: string[] = [];
+  for (const part of parts) {
+    if (part === "..") normalized.pop();
+    else if (part !== "." && part !== "") normalized.push(part);
+  }
+  return (path.startsWith("/") ? "/" : "") + normalized.join("/");
+}
+
+function loadHtmlImageDataUrl(
+  src: string,
+  basePath: string,
+  workspaceRoot?: string,
+): Promise<string> {
+  if (src.startsWith("/")) {
+    return invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", {
+      args: { path: src },
+    }).then((r) => r.dataUrl);
+  }
+  const relativePath = basePath.startsWith(workspaceRoot ?? "")
+    ? normalizePath((basePath.slice(workspaceRoot?.length ?? 0).replace(/^\//, "") + "/" + src).replace(/^\//, ""))
+    : src;
+  return invoke<{ dataUrl: string }>("read_file_as_data_url", {
+    args: { workspaceRoot: workspaceRoot ?? basePath, path: relativePath },
+  }).then((r) => r.dataUrl);
+}
+
+async function resolveLocalImages(html: string, basePath: string, workspaceRoot?: string): Promise<string> {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const imgs = doc.querySelectorAll("img[src]");
@@ -21,10 +49,9 @@ async function resolveLocalImages(html: string, basePath: string): Promise<strin
   for (const img of imgs) {
     const src = img.getAttribute("src");
     if (!src || IS_WEB_URL.test(src)) continue;
-    const absPath = src.startsWith("/") ? src : (basePath ? basePath + "/" + src : src);
     tasks.push(
-      invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", { args: { path: absPath } })
-        .then((r) => { img.setAttribute("src", r.dataUrl); })
+      loadHtmlImageDataUrl(src, basePath, workspaceRoot)
+        .then((dataUrl) => { img.setAttribute("src", dataUrl); })
         .catch(() => {}),
     );
   }
@@ -37,10 +64,11 @@ interface HtmlViewerProps {
   code: string;
   path: string;
   basePath?: string;
+  workspaceRoot?: string;
   className?: string;
 }
 
-export function HtmlViewer({ code, path, basePath, className }: HtmlViewerProps) {
+export function HtmlViewer({ code, path, basePath, workspaceRoot, className }: HtmlViewerProps) {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
 
@@ -62,8 +90,11 @@ export function HtmlViewer({ code, path, basePath, className }: HtmlViewerProps)
     setResolvedHtml(cleanHtml);
     const resolvedBase = basePath ?? getBaseDir(path);
     if (!resolvedBase) return;
-    resolveLocalImages(cleanHtml, resolvedBase).then(setResolvedHtml);
-  }, [cleanHtml, path, basePath]);
+    let stale = false;
+    resolveLocalImages(cleanHtml, resolvedBase, workspaceRoot)
+      .then((html) => { if (!stale) setResolvedHtml(html); });
+    return () => { stale = true; };
+  }, [cleanHtml, path, basePath, workspaceRoot]);
 
   const sanitizedHtml = useMemo(() => {
     const csp = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'">`;

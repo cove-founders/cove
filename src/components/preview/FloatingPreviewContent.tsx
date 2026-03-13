@@ -79,13 +79,13 @@ export function FloatingPreviewContent({
   }
 
   if (kind === "html" && cached?.type === "text" && cached.text !== undefined) {
-    return <HtmlViewer code={cached.text} path={path} basePath={computeMarkdownBasePath(path, workspaceRoot)} />;
+    return <HtmlViewer code={cached.text} path={path} basePath={computeMarkdownBasePath(path, workspaceRoot)} workspaceRoot={workspaceRoot ?? undefined} />;
   }
 
   if (kind === "md" && cached?.type === "text" && cached.text !== undefined) {
     return (
       <ScrollArea className="min-h-0 flex-1 p-1.5">
-        <MarkdownContent source={cached.text} className="text-[14px]" basePath={computeMarkdownBasePath(path, workspaceRoot)} />
+        <MarkdownContent source={cached.text} className="text-[14px]" basePath={computeMarkdownBasePath(path, workspaceRoot)} workspaceRoot={workspaceRoot ?? undefined} />
       </ScrollArea>
     );
   }

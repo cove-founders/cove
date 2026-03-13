@@ -28,25 +28,42 @@ function normalizePath(path: string): string {
   return (path.startsWith("/") ? "/" : "") + normalized.join("/");
 }
 
-function resolveAbsolutePath(src: string, basePath: string): string {
-  if (src.startsWith("/")) return src;
-  const joined = basePath === "" ? src : basePath + "/" + src;
-  return normalizePath(joined);
+function loadImageDataUrl(
+  src: string,
+  basePath: string,
+  workspaceRoot?: string,
+): Promise<string> {
+  if (src.startsWith("/")) {
+    return invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", {
+      args: { path: src },
+    }).then((r) => r.dataUrl);
+  }
+  const relativePath = basePath.startsWith(workspaceRoot ?? "")
+    ? normalizePath((basePath.slice(workspaceRoot?.length ?? 0).replace(/^\//, "") + "/" + src).replace(/^\//, ""))
+    : src;
+  return invoke<{ dataUrl: string }>("read_file_as_data_url", {
+    args: { workspaceRoot: workspaceRoot ?? basePath, path: relativePath },
+  }).then((r) => r.dataUrl);
 }
 
-function LocalImage({ src, alt, basePath }: { src: string; alt: string; basePath?: string }) {
+function LocalImage({
+  src, alt, basePath, workspaceRoot,
+}: {
+  src: string; alt: string; basePath?: string; workspaceRoot?: string;
+}) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!src || basePath === undefined) return;
-    const absPath = resolveAbsolutePath(src, basePath);
-    invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", {
-      args: { path: absPath },
-    })
-      .then((r) => setDataUrl(r.dataUrl))
-      .catch(() => setError(true));
-  }, [src, basePath]);
+    let stale = false;
+    setDataUrl(null);
+    setError(false);
+    loadImageDataUrl(src, basePath, workspaceRoot)
+      .then((url) => { if (!stale) setDataUrl(url); })
+      .catch(() => { if (!stale) setError(true); });
+    return () => { stale = true; };
+  }, [src, basePath, workspaceRoot]);
 
   if (error) return <span title={src}>[image: {src}]</span>;
   if (!dataUrl) return null;
@@ -68,7 +85,7 @@ export function computeMarkdownBasePath(
   return dir ? workspaceRoot + "/" + dir : workspaceRoot;
 }
 
-function createMarkdownComponents(basePath?: string): Components {
+function createMarkdownComponents(basePath?: string, workspaceRoot?: string): Components {
   return {
     p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
     h1: ({ children }) => <h1 className="mb-2 mt-4 text-xl font-semibold">{children}</h1>,
@@ -129,7 +146,7 @@ function createMarkdownComponents(basePath?: string): Components {
       if (basePath === undefined) {
         return <img src={src} alt={alt ?? ""} className="max-w-full rounded" loading="lazy" />;
       }
-      return <LocalImage src={src} alt={alt ?? ""} basePath={basePath} />;
+      return <LocalImage src={src} alt={alt ?? ""} basePath={basePath} workspaceRoot={workspaceRoot} />;
     },
     a: ({ href, children }) => (
       <a
@@ -159,6 +176,8 @@ export interface MarkdownContentProps {
   trailingCursor?: boolean;
   /** Directory containing the markdown file, used to resolve relative image paths */
   basePath?: string;
+  /** Workspace root for workspace-gated file access */
+  workspaceRoot?: string;
 }
 
 /**
@@ -169,11 +188,13 @@ export interface MarkdownContentProps {
 const SettledMarkdown = React.memo(function SettledMarkdown({
   source,
   basePath,
+  workspaceRoot,
 }: {
   source: string;
   basePath?: string;
+  workspaceRoot?: string;
 }) {
-  const components = useMemo(() => createMarkdownComponents(basePath), [basePath]);
+  const components = useMemo(() => createMarkdownComponents(basePath, workspaceRoot), [basePath, workspaceRoot]);
   return (
     <ReactMarkdown
       remarkPlugins={remarkPlugins}
@@ -217,7 +238,7 @@ function sanitizeInvalidHtmlLikeTags(source: string): string {
 
 import { cn } from "@/lib/utils";
 
-export function MarkdownContent({ source, className, trailingCursor, basePath }: MarkdownContentProps) {
+export function MarkdownContent({ source, className, trailingCursor, basePath, workspaceRoot }: MarkdownContentProps) {
   const normalizedSource = resolveFilePathsFromContext(
     sanitizeInvalidHtmlLikeTags(normalizeEscapedMarkdown(source)),
   );
@@ -240,7 +261,7 @@ export function MarkdownContent({ source, className, trailingCursor, basePath }:
     }
   }, [hasVisibleContent, source, normalizedSource, trailingCursor]);
 
-  const mdComponents = useMemo(() => createMarkdownComponents(basePath), [basePath]);
+  const mdComponents = useMemo(() => createMarkdownComponents(basePath, workspaceRoot), [basePath, workspaceRoot]);
 
   if (!hasVisibleContent) return null;
 
@@ -269,7 +290,7 @@ export function MarkdownContent({ source, className, trailingCursor, basePath }:
 
       return (
         <div className={wrapperCls} data-md>
-          <SettledMarkdown source={settled} basePath={basePath} />
+          <SettledMarkdown source={settled} basePath={basePath} workspaceRoot={workspaceRoot} />
           {pending ? (
             <p className="mb-0 last:mb-0 break-words">
               {pending}

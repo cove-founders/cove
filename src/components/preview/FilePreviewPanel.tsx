@@ -124,7 +124,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <HtmlViewer code={cached.text} path={selectedPath} basePath={computeMarkdownBasePath(selectedPath, workspaceRoot)} />
+        <HtmlViewer code={cached.text} path={selectedPath} basePath={computeMarkdownBasePath(selectedPath, workspaceRoot)} workspaceRoot={workspaceRoot ?? undefined} />
       </div>
     );
   }
@@ -179,7 +179,7 @@ export function FilePreviewPanel() {
         </div>
         <ScrollArea className="min-h-0 flex-1 p-1.5">
           {mdViewMode === "preview" ? (
-            <MarkdownContent source={cached.text} className="text-[14px]" basePath={computeMarkdownBasePath(selectedPath, workspaceRoot)} />
+            <MarkdownContent source={cached.text} className="text-[14px]" basePath={computeMarkdownBasePath(selectedPath, workspaceRoot)} workspaceRoot={workspaceRoot ?? undefined} />
           ) : (
             <CodeViewer path={selectedPath} code={cached.text} className="file-preview-code" />
           )}
