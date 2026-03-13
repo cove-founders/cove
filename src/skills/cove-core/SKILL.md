@@ -21,8 +21,10 @@ Do not claim success, concrete IDs/URLs, or completed side effects until a tool 
 
 `write` creates DOCX automatically when the path ends in `.docx` -- pass markdown content. No need to load OfficeLLM skill or call the `office` tool.
 
+**Important**: `read` returns Office content with a `[Office Document: ...]` header and `00001|` line-number prefixes. When composing content for `write`, strip these wrappers -- pass only the actual text/markdown to `write`.
+
 Common shortcuts:
-- Merge documents: `read` each file, combine content, `write` to new .docx (3 calls)
+- Merge documents: `read` each file, strip headers/line numbers, combine text, `write` to new .docx (3 calls)
 - Convert markdown to DOCX: `write` with .docx path (1 call)
 - Extract text from DOCX: `read` the file (1 call)
 
