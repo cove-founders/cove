@@ -58,9 +58,11 @@ describe("layoutStore", () => {
       expect(useLayoutStore.getState().chatWidth).toBe(360);
     });
 
-    it("clamps to maximum 9999", () => {
+    it("clamps to viewport-based maximum", () => {
+      // In Node test env, window is undefined; fallback viewport = 1440
+      // max = 1440 - 200 (sidebar min) - 100 (buffer) = 1140
       useLayoutStore.getState().setChatWidth(20000);
-      expect(useLayoutStore.getState().chatWidth).toBe(9999);
+      expect(useLayoutStore.getState().chatWidth).toBe(1140);
     });
   });
 
@@ -316,6 +318,27 @@ describe("layoutStore", () => {
       expect(s.fileTreeWidth).toBe(300);
       expect(s.filePreviewWidth).toBe(400);
       expect(s.fileTreeShowHidden).toBe(false);
+    });
+
+    it("clamps oversized persisted widths to viewport on load", async () => {
+      // Fallback viewport = 1440 in Node test env
+      vi.mocked(readConfig).mockResolvedValue({
+        leftSidebarOpen: true,
+        leftSidebarWidth: 5000,
+        chatWidth: 5000,
+        filePanelOpen: true,
+        fileTreeOpen: true,
+        filePreviewOpen: true,
+        fileTreeWidth: 260,
+        filePreviewWidth: 360,
+        fileTreeShowHidden: true,
+      });
+      await useLayoutStore.getState().init();
+      const s = useLayoutStore.getState();
+      // sidebar max = floor(1440 * 0.5) = 720
+      expect(s.leftSidebarWidth).toBe(720);
+      // chat max = 1440 - 200 - 100 = 1140
+      expect(s.chatWidth).toBe(1140);
     });
 
     it("ensures file tree open when panel is open, preserves preview state", async () => {

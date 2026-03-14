@@ -34,7 +34,23 @@ interface LayoutState {
 }
 
 const CHAT_MIN = 360;
-const CHAT_MAX = 9999;
+const SIDEBAR_MIN_W = 200;
+
+function getViewportWidth(): number {
+  return typeof window !== "undefined" && window.innerWidth > 0
+    ? window.innerWidth
+    : 1440;
+}
+
+/** Sidebar max: 50% of viewport */
+function getSidebarMax(): number {
+  return Math.max(SIDEBAR_MIN_W, Math.floor(getViewportWidth() * 0.5));
+}
+
+/** Chat max: viewport minus sidebar and a 100px buffer for file panel */
+function getChatMax(): number {
+  return Math.max(CHAT_MIN, getViewportWidth() - SIDEBAR_MIN_W - 100);
+}
 
 const FILE_TREE_MIN = 200;
 const FILE_TREE_MAX = 480;
@@ -64,13 +80,13 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
     persistLayout(get());
   },
   setLeftSidebarWidth: (width) => {
-    set({ leftSidebarWidth: width });
+    set({ leftSidebarWidth: Math.min(getSidebarMax(), Math.max(SIDEBAR_MIN_W, width)) });
     persistLayout(get());
   },
 
   chatWidth: 640,
   setChatWidth: (width) => {
-    set({ chatWidth: Math.min(CHAT_MAX, Math.max(CHAT_MIN, width)) });
+    set({ chatWidth: Math.min(getChatMax(), Math.max(CHAT_MIN, width)) });
     persistLayout(get());
   },
 
@@ -155,8 +171,8 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
     const config = await readConfig<LayoutConfig>("layout");
     set({
       leftSidebarOpen: config.leftSidebarOpen,
-      leftSidebarWidth: config.leftSidebarWidth,
-      chatWidth: config.chatWidth,
+      leftSidebarWidth: Math.min(getSidebarMax(), Math.max(SIDEBAR_MIN_W, config.leftSidebarWidth)),
+      chatWidth: Math.min(getChatMax(), Math.max(CHAT_MIN, config.chatWidth)),
       filePanelOpen: config.filePanelOpen,
       fileTreeOpen: config.filePanelOpen ? true : config.fileTreeOpen,
       filePreviewOpen: config.filePreviewOpen,

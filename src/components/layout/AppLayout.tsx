@@ -20,9 +20,7 @@ import { openSettingsWindow } from "@/lib/settings-window";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 
 const SIDEBAR_MIN = 200;
-const SIDEBAR_MAX = 9999;
 const CHAT_MIN = 480;
-const CHAT_MAX = 9999;
 const FILE_TREE_MIN = 200;
 const FILE_TREE_MAX = 480;
 const FILE_PREVIEW_MIN = 200;
@@ -53,6 +51,8 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
 
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [searchMessagesOpen, setSearchMessagesOpen] = useState(false);
+  const sidebarMax = Math.max(SIDEBAR_MIN, Math.floor(window.innerWidth * 0.5));
+  const chatMax = Math.max(CHAT_MIN, window.innerWidth - (leftOpen ? leftSidebarWidth : SIDEBAR_MIN) - 100);
   const middleSectionRef = useRef<HTMLDivElement>(null);
   const [chatColumnCloseTarget, setChatColumnCloseTarget] = useState<number | null>(null);
   const [chatColumnOpenTarget, setChatColumnOpenTarget] = useState<number | null>(null);
@@ -240,7 +240,7 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
             currentWidth={leftSidebarWidth}
             onResize={setLeftSidebarWidth}
             minWidth={SIDEBAR_MIN}
-            maxWidth={SIDEBAR_MAX}
+            maxWidth={sidebarMax}
           />
         </div>
       ) : (
@@ -269,7 +269,7 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
                 currentWidth={chatWidth}
                 onResize={setChatWidth}
                 minWidth={CHAT_MIN}
-                maxWidth={CHAT_MAX}
+                maxWidth={chatMax}
               />
             </div>
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
