@@ -78,6 +78,24 @@ const SIDEBAR_MAX = 400;
 
 const CHAT_MIN = 360;
 const CHAT_MAX = 1200;
+const SIDEBAR_MIN_W = 200;
+
+function getViewportWidth(): number {
+  return typeof window !== "undefined" && window.innerWidth > 0
+    ? window.innerWidth
+    : 1440;
+}
+
+/** Sidebar max: 50% of viewport */
+function getSidebarMax(): number {
+  return Math.max(SIDEBAR_MIN_W, Math.floor(getViewportWidth() * 0.5));
+}
+
+/** Chat max: viewport minus actual sidebar width and a 100px buffer for file panel */
+function getChatMax(sidebarWidth: number, sidebarOpen: boolean): number {
+  const sidebar = sidebarOpen ? sidebarWidth : SIDEBAR_MIN_W;
+  return Math.max(CHAT_MIN, getViewportWidth() - sidebar - 100);
+}
 
 const FILE_TREE_MIN = 200;
 const FILE_TREE_MAX = 480;
@@ -162,7 +180,9 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
   /* Conversation mode chat width */
   chatWidth: 640,
   setChatWidth: (width) => {
-    set({ chatWidth: Math.min(CHAT_MAX, Math.max(CHAT_MIN, width)) });
+    const s = get();
+    const max = getChatMax(s.leftSidebarWidth, s.leftSidebarOpen);
+    set({ chatWidth: Math.min(max, Math.max(CHAT_MIN, width)) });
     persistLayout(get());
   },
 
@@ -268,11 +288,13 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
 
   init: async () => {
     const config = await readConfig<LayoutConfig>("layout");
+    const clampedSidebar = Math.min(getSidebarMax(), Math.max(SIDEBAR_MIN_W, config.leftSidebarWidth));
+    const chatMax = getChatMax(clampedSidebar, config.leftSidebarOpen);
     set({
       leftSidebarMode: config.leftSidebarMode ?? "full",
       leftSidebarOpen: (config.leftSidebarMode ?? "full") !== "hidden",
-      leftSidebarWidth: config.leftSidebarWidth,
-      chatWidth: config.chatWidth,
+      leftSidebarWidth: clampedSidebar,
+      chatWidth: Math.min(chatMax, Math.max(CHAT_MIN, config.chatWidth)),
       filePanelOpen: config.filePanelOpen,
       fileTreeOpen: config.filePanelOpen ? true : config.fileTreeOpen,
       filePreviewOpen: config.filePreviewOpen,

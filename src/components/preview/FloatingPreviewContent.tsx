@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { MarkdownContent } from "@/components/chat/MarkdownContent";
+import { MarkdownContent, computeMarkdownBasePath } from "@/components/chat/MarkdownContent";
 import { CodeViewer } from "@/components/preview/CodeViewer";
 import { CsvViewer } from "@/components/preview/CsvViewer";
 import { HtmlViewer } from "@/components/preview/HtmlViewer";
@@ -79,13 +79,13 @@ export function FloatingPreviewContent({
   }
 
   if (kind === "html" && cached?.type === "text" && cached.text !== undefined) {
-    return <HtmlViewer code={cached.text} path={path} />;
+    return <HtmlViewer code={cached.text} path={path} basePath={computeMarkdownBasePath(path, workspaceRoot)} workspaceRoot={workspaceRoot ?? undefined} />;
   }
 
   if (kind === "md" && cached?.type === "text" && cached.text !== undefined) {
     return (
       <ScrollArea className="min-h-0 flex-1 p-1.5">
-        <MarkdownContent source={cached.text} className="text-[14px]" />
+        <MarkdownContent source={cached.text} className="text-[14px]" basePath={computeMarkdownBasePath(path, workspaceRoot)} workspaceRoot={workspaceRoot ?? undefined} />
       </ScrollArea>
     );
   }

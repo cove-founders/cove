@@ -37,7 +37,7 @@ function encodeFilePath(absPath: string): string {
 export function createWriteTool(workspacePath?: string) {
   return tool({
   description:
-    "Write or overwrite a file in the workspace. Can create Office documents (DOCX) via officellm. You must have read the file in this conversation before overwriting. Path is relative to workspace root.",
+    "Write or overwrite a file in the workspace. For .docx paths, automatically creates a formatted DOCX from markdown content -- no need to load OfficeLLM skill or use the office tool. You must have read the file in this conversation before overwriting. Path is relative to workspace root.",
   inputSchema: z.object({
     filePath: z.string().describe("Relative path to the file from workspace root"),
     content: z.string().describe("Full new content of the file"),

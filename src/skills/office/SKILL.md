@@ -5,78 +5,83 @@ emoji: "📄"
 always: false
 ---
 
-# Office (Bundled Tauri Tool)
+# OfficeLLM Command Guide
 
-## Two entry points
+## First step: discover, do not guess
 
-**Single operations** -- use the `office` tool:
+When you use the bundled `office` tool and you are not certain about the command name or parameters, discover first:
+
+1. `office(command: "help")`
+2. `office(command: "list-commands")`
+3. `office(command: "get-command-schema", args: { name: "<command>" })`
+4. Only then execute the document command
+
+For wrapper commands (`open`, `save`, `status`, etc.), inspect them with:
+
+```text
+office(command: "help", args: { name: "save" })
 ```
-office(command: "open", args: {path: "doc.docx"})
-office(command: "create")
-office(command: "create", args: {markdown: "# Title\n\nContent"})
-office(command: "replace-text", args: {find: "old", replace: "new"})
-office(command: "save")
+
+## Wrapper commands vs document commands
+
+**Cove wrapper commands**
+- `help`
+- `detect`
+- `doctor`
+- `list-commands`
+- `get-command-schema`
+- `open`
+- `create`
+- `save`
+- `close`
+- `status`
+
+**OfficeLLM document commands**
+- Real runtime commands such as `replace-text`, `insert`, `extract-text`, `list-structure`
+- Discover these at runtime with `list-commands` / `get-command-schema`
+
+## Tool priority
+
+1. **`office` tool** — single operations and command discovery
+2. **`cove_interpreter` + officellm bridge** — multi-step workflows on the same document
+3. **`skill_resource`** — workflow and mapping guides, not command schema lookup
+
+## Single-operation examples
+
+```text
+office(command: "help")
+office(command: "list-commands", args: { category: "Editing" })
+office(command: "get-command-schema", args: { name: "replace-text" })
+office(command: "open", args: { path: "report.docx" })
+office(command: "replace-text", args: { find: "old", replace: "new" })
+office(command: "save", args: { path: "report-final.docx" })
 office(command: "close")
-office(command: "from-markdown", args: {i: "in.md", o: "out.docx"})
 ```
 
-**Multi-step workflows** -- use `cove_interpreter` with the officellm bridge:
+## Multi-step workflows
+
+Use the built-in `cove_interpreter` officellm bridge when you need multiple operations on the same active document:
+
 ```lua
--- Edit existing document
 local doc = officellm.open("report.docx")
-doc.call("replace-text", { find = "old", replace = "new" })
-doc.call("apply-format", { find = "Important", bold = true })
-doc.save("report-updated.docx")
-doc.close()
-
--- Create new document from scratch
-local doc = officellm.create({ markdown = "# Report\n\nContent here" })
-doc.call("apply-format", { find = "Report", bold = true })
-doc.save("report.docx")  -- create documents require a path on save
+doc.call("replace-text", { find = "Draft", replace = "Final" })
+doc.call("apply-format", { find = "Final", bold = true })
+doc.save("report-final.docx")
 doc.close()
 ```
-
-Batch operations via `doc.execute()`:
-```lua
-doc.execute({
-  { op = "ReplaceText", target = "Draft", payload = "Final" },
-  { op = "ApplyFormat", target = "Title", format = { bold = true, fontSize = "16pt" } }
-}, { atomic = true, dryRun = true })
-```
-
-Stateless (no open needed): `officellm.call("from-markdown", { i = "in.md", o = "out.docx" })`.
-
-## officellm bridge API (cove_interpreter)
-
-When officellm is available, a bridge API is auto-injected into the Lua runtime.
-Use it for multi-step workflows combining multiple operations on the same document.
-For single operations, use the `office` tool directly.
-
-**Low-level workspace.officellm()** is also available for direct calls:
-```lua
-local raw = json.decode(workspace.officellm("extract-text", { i = "report.docx" }))
-if raw.status == "success" then print(raw.data.text) end
-```
-
-Rules:
-- Always check `status` before `open`. Always `close` when done.
-- Wrap calls in `pcall`; log the command name in error messages.
-- `workspace.officellm()` returns a JSON string; always `json.decode()` it.
 
 ## Session coordination
 
-The officellm server is a process-wide singleton. Both the `office` tool and `cove_interpreter` share one session via the same Rust mutex.
+- `office` and `cove_interpreter` share one process-wide officellm session
+- Check `office(command: "status")` before `open` if you suspect another document is active
+- Always `close` when the workflow is done
+- Do not use `bash` to run `officellm`; bundled office must go through the `office` tool
 
-- Always check `office(command: "status")` before `open`. Always `close` when done.
-- If open fails with "session already active", close first, then retry.
-- Do NOT use `bash` to run officellm CLI — it bypasses session coordination.
-- Prefer `office` tool for single operations; `cove_interpreter` + bridge for multi-step workflows.
+## Simple tasks: skip this skill
 
-## Document operation priorities
+For simple read/write/merge tasks, the `read` and `write` tools handle DOCX directly without loading this skill. Only load this skill when you need advanced operations (formatting, find-replace, slide manipulation, spreadsheet formulas).
 
-1. **`office` tool** — preferred for single operations
-2. **`cove_interpreter` + officellm bridge** — for multi-step workflows
-3. MUST load OfficeLLM skill (via the `skill` tool) before calling any command by name
+## Resources
 
 Common mistakes:
 - Do NOT call `office` tool before loading the OfficeLLM skill — you will guess wrong command names
@@ -169,3 +174,6 @@ Whenever a file is successfully written to disk (save, export, pack, convert, et
 ```
 
 Always use the absolute path. Apply this to every generated, edited, or saved file.
+
+- `resources/command-discovery.md` — exact discovery workflow for bundled office
+- `resources/command-mapping.md` — common naming differences and when to use wrapper commands

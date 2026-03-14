@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Code, Eye, Languages, PanelLeftClose, PanelLeft } from "lucide-react";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { invoke } from "@tauri-apps/api/core";
-import { MarkdownContent } from "@/components/chat/MarkdownContent";
+import { MarkdownContent, computeMarkdownBasePath } from "@/components/chat/MarkdownContent";
 import { CodeViewer } from "@/components/preview/CodeViewer";
 import { CsvViewer } from "@/components/preview/CsvViewer";
 import { HtmlViewer } from "@/components/preview/HtmlViewer";
@@ -367,7 +367,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
-        <HtmlViewer code={cached.text} path={selectedPath} />
+        <HtmlViewer code={cached.text} path={selectedPath} basePath={computeMarkdownBasePath(selectedPath, workspaceRoot)} workspaceRoot={workspaceRoot ?? undefined} />
       </div>
     );
   }
@@ -416,7 +416,7 @@ export function FilePreviewPanel() {
           </ScrollArea>
         ) : (
           <ScrollArea className="min-h-0 flex-1 p-4">
-            <MarkdownContent source={mdDisplayText} className="text-[14px]" />
+            <MarkdownContent source={mdDisplayText} className="text-[14px]" basePath={computeMarkdownBasePath(selectedPath, workspaceRoot)} workspaceRoot={workspaceRoot ?? undefined} />
           </ScrollArea>
         )}
       </div>
