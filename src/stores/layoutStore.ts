@@ -34,7 +34,7 @@ interface LayoutState {
 }
 
 const CHAT_MIN = 360;
-const CHAT_MAX = 1200;
+const CHAT_MAX = 9999;
 
 const FILE_TREE_MIN = 200;
 const FILE_TREE_MAX = 480;

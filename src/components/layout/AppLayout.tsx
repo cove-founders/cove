@@ -20,9 +20,9 @@ import { openSettingsWindow } from "@/lib/settings-window";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 
 const SIDEBAR_MIN = 200;
-const SIDEBAR_MAX = 400;
+const SIDEBAR_MAX = 9999;
 const CHAT_MIN = 480;
-const CHAT_MAX = 1200;
+const CHAT_MAX = 9999;
 const FILE_TREE_MIN = 200;
 const FILE_TREE_MAX = 480;
 const FILE_PREVIEW_MIN = 200;
@@ -251,9 +251,9 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
         {filePanelOpen || filePanelClosing ? (
           <>
             <div
-              className={`relative flex min-w-0 flex-col overflow-hidden border-r border-border transition-[width] duration-300 ease-out${isAnimating || previewVisible ? " shrink-0" : " flex-1"}`}
+              className={`relative flex min-w-0 shrink-0 flex-col overflow-hidden border-r border-border transition-[width] duration-300 ease-out`}
               style={{
-                width: isAnimating ? chatColumnTargetWidth : previewVisible ? chatWidth : undefined,
+                width: isAnimating ? chatColumnTargetWidth : chatWidth,
                 minWidth: CHAT_MIN,
                 willChange: isAnimating ? "width" : undefined,
               }}
@@ -272,7 +272,7 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
                 maxWidth={CHAT_MAX}
               />
             </div>
-            <div className={`flex flex-col overflow-hidden bg-background${previewVisible ? " min-w-0 flex-1" : " shrink-0"}`}>
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
               <div
                 className="flex min-h-0 min-w-0 flex-1 flex-col"
                 style={{
@@ -284,7 +284,7 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
                 <div className="flex min-h-0 flex-1">
                   {fileTreeOpen && (
                     <div
-                      className="relative flex shrink-0 flex-col overflow-hidden"
+                      className={`relative flex flex-col overflow-hidden${previewVisible ? " shrink-0" : " flex-1"}`}
                       style={{ width: fileTreeWidth, minWidth: FILE_TREE_MIN }}
                     >
                       <FileTreePanel />

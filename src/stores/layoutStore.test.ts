@@ -58,9 +58,9 @@ describe("layoutStore", () => {
       expect(useLayoutStore.getState().chatWidth).toBe(360);
     });
 
-    it("clamps to maximum 1200", () => {
-      useLayoutStore.getState().setChatWidth(2000);
-      expect(useLayoutStore.getState().chatWidth).toBe(1200);
+    it("clamps to maximum 9999", () => {
+      useLayoutStore.getState().setChatWidth(20000);
+      expect(useLayoutStore.getState().chatWidth).toBe(9999);
     });
   });
 
