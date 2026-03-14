@@ -249,7 +249,7 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
         {filePanelOpen || filePanelClosing ? (
           <>
             <div
-              className={`relative flex min-w-0 shrink-0 flex-col overflow-hidden border-r border-border transition-[width] duration-300 ease-out`}
+              className={`relative flex min-w-0 shrink-0 flex-col overflow-hidden border-r border-border${isAnimating ? " transition-[width] duration-300 ease-out" : ""}`}
               style={{
                 width: isAnimating ? chatColumnTargetWidth : chatWidth,
                 minWidth: CHAT_MIN,
