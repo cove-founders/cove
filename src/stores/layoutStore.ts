@@ -49,7 +49,7 @@ function getSidebarMax(): number {
 
 /** Chat max: viewport minus actual sidebar width and a 100px buffer for file panel */
 function getChatMax(sidebarWidth: number, sidebarOpen: boolean): number {
-  const sidebar = sidebarOpen ? sidebarWidth : 0;
+  const sidebar = sidebarOpen ? sidebarWidth : SIDEBAR_MIN_W;
   return Math.max(CHAT_MIN, getViewportWidth() - sidebar - 100);
 }
 

@@ -64,6 +64,14 @@ describe("layoutStore", () => {
       useLayoutStore.getState().setChatWidth(20000);
       expect(useLayoutStore.getState().chatWidth).toBe(1080);
     });
+
+    it("uses SIDEBAR_MIN when sidebar is closed", () => {
+      // Fallback viewport = 1440, sidebar closed -> uses SIDEBAR_MIN (200)
+      // max = 1440 - 200 - 100 = 1140
+      useLayoutStore.setState({ leftSidebarOpen: false });
+      useLayoutStore.getState().setChatWidth(20000);
+      expect(useLayoutStore.getState().chatWidth).toBe(1140);
+    });
   });
 
   describe("toggleFilePanel", () => {
