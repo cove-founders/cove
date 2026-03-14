@@ -235,7 +235,7 @@ export function ChatInput({
     setDraftBeforeHistory(null);
     setMessage("");
     const withHint = webSearchEnabled
-      ? `${content}\n\n[Web search enabled: use fetch_url to retrieve current information when needed, e.g. https://html.duckduckgo.com/html/?q=YOUR_QUERY]`
+      ? `${content}\n\n[Web search enabled: use the web_search tool to find current information when needed.]`
       : content;
     sendMessage(withHint);
   };

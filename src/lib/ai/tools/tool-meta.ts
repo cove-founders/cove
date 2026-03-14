@@ -17,6 +17,7 @@ export const ALL_TOOL_INFOS: ToolInfo[] = [
   { id: "edit", name: "Edit File", description: "Apply targeted edits to an existing file.", category: "built-in", userVisible: true },
   { id: "bash", name: "Shell Command", description: "Execute a shell command in the workspace.", category: "built-in", userVisible: true },
   { id: "fetch_url", name: "Fetch URL", description: "Fetch content from a URL and return it as text.", category: "built-in", userVisible: true },
+  { id: "web_search", name: "Web Search", description: "Search the web for current information. Uses Tavily API with SearXNG as fallback.", category: "built-in", userVisible: true },
   { id: "parse_document", name: "Parse Document", description: "Parse document files into structured text. Accepts attachmentId or filePath (workspace-relative).", category: "built-in", userVisible: true },
   { id: "skill", name: "Load Skill", description: "Load a skill's instructions into the conversation.", category: "built-in", userVisible: false },
   { id: "skill_resource", name: "Skill Resource", description: "Load a specific resource guide from an enabled skill.", category: "built-in", userVisible: false },

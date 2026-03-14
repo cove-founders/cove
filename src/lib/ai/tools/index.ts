@@ -5,6 +5,7 @@ import { createWriteTool } from "./write";
 import { createEditTool } from "./edit";
 import { createBashTool } from "./bash";
 import { fetchUrlTool } from "./fetch-url";
+import { webSearchTool } from "./web-search";
 import { createSkillTool, createSkillResourceTool } from "./skill";
 import { writeSkillTool } from "./write-skill";
 import { officeTool } from "./office";
@@ -27,6 +28,7 @@ const TOOL_IMPLS: Record<string, AnyTool> = {
   // write and edit are created per-call via factories to capture workspacePath
   // bash is created per-conversation via createBashTool — not a static singleton
   fetch_url: fetchUrlTool,
+  web_search: webSearchTool,
   cove_interpreter: interpreterTool,
   write_skill: writeSkillTool,
   office: officeTool,

@@ -1,6 +1,6 @@
 // FILE_SIZE_EXCEPTION: 4 type-specific detail panels (Skill/Tool/Connector/SubAgent) + shared utilities in one dispatcher
-import { useState, useEffect, useMemo } from "react";
-import { MoreHorizontal, Wand2, Wrench, Blocks, Bot, MessageSquare, Pencil, Trash2, FolderOpen } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { MoreHorizontal, Wand2, Wrench, Blocks, Bot, MessageSquare, Pencil, Trash2, FolderOpen, Eye, EyeOff, ExternalLink } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +20,10 @@ import { mcpServerRepo } from "@/db/repos/mcpServerRepo";
 import { subAgentRepo } from "@/db/repos/subAgentRepo";
 import type { McpServer, SubAgentDef } from "@/db/types";
 import { ALL_TOOL_INFOS } from "@/lib/ai/tools/tool-meta";
+import { readConfig, writeConfig } from "@/lib/config";
+import type { ToolsConfig } from "@/lib/config/types";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { SkillEditDialog } from "@/components/settings/SkillEditDialog";
 import { parseSkillFields, buildSkillMd } from "@/components/settings/skill-utils";
 import { CreateMcpDialog } from "./CreateMcpDialog";
@@ -229,6 +233,104 @@ function SkillDetailContent({
   );
 }
 
+// ── Web Search API key config ──────────────────────────────────────────────────
+
+function WebSearchConfig() {
+  const [tavilyKey, setTavilyKey] = useState("");
+  const [searxngUrl, setSearxngUrl] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    void readConfig<ToolsConfig>("tools").then((cfg) => {
+      setTavilyKey(cfg.tavilyApiKey ?? "");
+      setSearxngUrl(cfg.searxngUrl ?? "https://searx.be");
+    });
+  }, []);
+
+  const save = useCallback(async () => {
+    await writeConfig<ToolsConfig>("tools", {
+      tavilyApiKey: tavilyKey.trim(),
+      searxngUrl: searxngUrl.trim() || "https://searx.be",
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }, [tavilyKey, searxngUrl]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+        API 配置
+      </span>
+
+      {/* Tavily */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-medium text-foreground">Tavily API Key</span>
+          <a
+            href="https://app.tavily.com"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 text-[12px] text-foreground-tertiary hover:text-foreground"
+          >
+            免费获取
+            <ExternalLink size={10} />
+          </a>
+        </div>
+        <p className="text-[12px] text-foreground-tertiary">
+          优先使用，结构化结果更好。免费版每月 1000 次。
+        </p>
+        <div className="relative">
+          <Input
+            type={showKey ? "text" : "password"}
+            value={tavilyKey}
+            onChange={(e) => setTavilyKey(e.target.value)}
+            placeholder="tvly-..."
+            className="pr-9 font-mono text-[13px]"
+          />
+          <button
+            type="button"
+            onClick={() => setShowKey((v) => !v)}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-tertiary hover:text-foreground"
+          >
+            {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
+          </button>
+        </div>
+      </div>
+
+      {/* SearXNG */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-medium text-foreground">SearXNG 实例地址</span>
+          <a
+            href="https://searx.space"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 text-[12px] text-foreground-tertiary hover:text-foreground"
+          >
+            查看公开实例
+            <ExternalLink size={10} />
+          </a>
+        </div>
+        <p className="text-[12px] text-foreground-tertiary">
+          无 Tavily Key 时的回退引擎，可自建或使用公开实例。
+        </p>
+        <Input
+          type="text"
+          value={searxngUrl}
+          onChange={(e) => setSearxngUrl(e.target.value)}
+          placeholder="https://searx.be"
+          className="font-mono text-[13px]"
+        />
+      </div>
+
+      <Button size="sm" onClick={() => void save()} variant={saved ? "outline" : "default"} className="self-end">
+        {saved ? "已保存" : "保存"}
+      </Button>
+    </div>
+  );
+}
+
 // ── Tool detail ───────────────────────────────────────────────────────────────
 
 function ToolDetailContent({ toolKey }: { toolKey: string }) {
@@ -272,6 +374,12 @@ function ToolDetailContent({ toolKey }: { toolKey: string }) {
             描述
           </span>
           <p className="text-[13px] leading-relaxed text-foreground-secondary">{info.description}</p>
+        </div>
+      )}
+
+      {info.id === "web_search" && (
+        <div className="rounded-xl border border-border bg-background-secondary p-4">
+          <WebSearchConfig />
         </div>
       )}
     </div>

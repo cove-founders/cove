@@ -35,6 +35,11 @@ export interface SkillsConfig {
   dirPaths: string[];
 }
 
+export interface ToolsConfig {
+  tavilyApiKey: string;
+  searxngUrl: string;
+}
+
 export const CONFIG_DEFAULTS = {
   appearance: { theme: "system", fontSize: "md" } satisfies AppearanceConfig,
   layout: {
@@ -63,4 +68,8 @@ export const CONFIG_DEFAULTS = {
     enabled: [],
     dirPaths: [],
   } satisfies SkillsConfig,
+  tools: {
+    tavilyApiKey: "",
+    searxngUrl: "https://searx.be",
+  } satisfies ToolsConfig,
 } as const;

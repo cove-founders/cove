@@ -192,7 +192,9 @@
     "translating": "Translating…"
   },
   "common": {
-    "settings": "Settings"
+    "settings": "Settings",
+    "save": "Save",
+    "saved": "Saved"
   },
   "provider": {
     "aliyun": {
@@ -248,7 +250,14 @@
     }
   },
   "tools": {
-    "title": "Tools"
+    "title": "Tools",
+    "apiKeys": "API Keys",
+    "tavilyApiKey": "Tavily API Key",
+    "tavilyHint": "Used for web search. Returns structured results. Free tier: 1,000 searches/month.",
+    "getKey": "Get key",
+    "searxngUrl": "SearXNG Instance URL",
+    "searxngHint": "Fallback search engine when no Tavily key is set. Use a public instance or self-host.",
+    "searxngInstances": "Browse instances"
   },
   "tool": {
     "pending": "Pending",

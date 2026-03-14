@@ -2,7 +2,7 @@
   "settings": {
     "tabs": {
       "general": "通用",
-      "providers": "提供商",
+      "providers": "模型",
       "skills": "技能",
       "tools": "工具",
       "appearance": "外观",
@@ -192,7 +192,9 @@
     "translating": "翻译中…"
   },
   "common": {
-    "settings": "设置"
+    "settings": "设置",
+    "save": "保存",
+    "saved": "已保存"
   },
   "provider": {
     "aliyun": {
@@ -248,7 +250,14 @@
     }
   },
   "tools": {
-    "title": "工具"
+    "title": "工具",
+    "apiKeys": "API 密钥配置",
+    "tavilyApiKey": "Tavily API Key",
+    "tavilyHint": "优先用于网页搜索，提供结构化结果。免费版每月 1000 次。",
+    "getKey": "获取密钥",
+    "searxngUrl": "SearXNG 实例地址",
+    "searxngHint": "无 Tavily Key 时的回退搜索引擎，可自建或使用公开实例。",
+    "searxngInstances": "查看公开实例"
   },
   "tool": {
     "pending": "进行中",
